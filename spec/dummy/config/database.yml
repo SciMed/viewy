@@ -1,25 +1,36 @@
-# SQLite version 3.x
-#   gem install sqlite3
+# PostgreSQL. Versions 8.2 and up are supported.
 #
-#   Ensure the SQLite 3 gem is defined in your Gemfile
-#   gem 'sqlite3'
+# Install the pg driver:
+#   gem install pg
+# On Mac OS X with macports:
+#   gem install pg -- --with-pg-config=/opt/local/lib/postgresql84/bin/pg_config
+# On Windows:
+#   gem install pg
+#       Choose the win32 build.
+#       Install PostgreSQL and put its /bin directory on your path.
 #
-default: &default
-  adapter: sqlite3
-  pool: 5
-  timeout: 5000
-
+# Configure Using Gemfile
+# gem 'pg'
+#
 development:
-  <<: *default
-  database: db/development.sqlite3
+  adapter: postgresql
+  encoding: unicode
+  pool: 5
+  database: viewy_development
+  username: <%= ENV['POSTGRES_USER'] %>
+  password: <%= ENV['POSTGRES_PASS'] %>
+  host: <%= ENV['APP_HOST'] %>
+  port: <%= ENV['APP_PORT'] %>
+  schema_search_path: public
 
-# Warning: The database defined as "test" will be erased and
-# re-generated from your development database when you run "rake".
-# Do not set this db to the same as development or production.
 test:
-  <<: *default
-  database: db/test.sqlite3
+  adapter: postgresql
+  encoding: unicode
+  pool: 5
+  database: viewy_test
+  username: <%= ENV['POSTGRES_USER'] %>
+  password: <%= ENV['POSTGRES_PASS'] %>
+  host: <%= ENV['APP_HOST'] %>
+  port: <%= ENV['APP_PORT'] %>
+  schema_search_path: public
 
-production:
-  <<: *default
-  database: db/production.sqlite3
