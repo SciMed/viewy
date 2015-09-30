@@ -14,7 +14,7 @@ module Viewy
       def refresh!
         view_dep = Viewy::Models::MaterializedViewDependency.find(table_name)
         view_dep.view_dependencies.each do |view_dependency|
-          connection.execute("REFRESH MATERIALIZED VIEW #{view_dependency}")
+          ActiveRecord::Base.connection.execute("REFRESH MATERIALIZED VIEW #{view_dependency}")
         end
       end
     end

@@ -14,7 +14,7 @@ module Viewy
       def refresh!
         view_dep = Viewy::Models::MaterializedViewDependency.find(table_name)
         view_dep.view_dependencies.each do |view_dependency|
-          connection.execute("REFRESH MATERIALIZED VIEW #{view_dependency}")
+          ActiveRecord::Base.connection.execute("REFRESH MATERIALIZED VIEW #{view_dependency}")
         end
         refresh_without_dependencies!
       end
@@ -25,7 +25,7 @@ module Viewy
       #
       # @return [PG::Result] the result of the refresh statement on the materialized view
       def refresh_without_dependencies!
-        connection.execute("REFRESH MATERIALIZED VIEW #{table_name}")
+        ActiveRecord::Base.connection.execute("REFRESH MATERIALIZED VIEW #{table_name}")
       end
     end
   end

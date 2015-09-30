@@ -1,29 +1,19 @@
 require 'rails_helper'
 
-describe Viewy::DependencyManager do
+describe Viewy::DependencyManagement::ViewRefresher do
   let(:dummy_connection) do
     double 'SomeConnection',
       execute: true
   end
 
-  before do
-    allow_any_instance_of(described_class).to receive(:connection).and_return(dummy_connection)
+  subject do
+    described_class.new(dummy_connection)
   end
 
-  describe 'initialization' do
-    it 'refreshes the materialized_view_dependencies view' do
-      described_class.new
-      expect(dummy_connection).to have_received(:execute)
-          .with('REFRESH MATERIALIZED VIEW materialized_view_dependencies')
-    end
-  end
-
-  describe '#replace_view' do
-    it 'uses the replace_view SQL function to replace the passed view name with teh provided view SQL' do
-      subject.replace_view('foo', 'SELECT * FROM bar')
-      expect(dummy_connection).to have_received(:execute)
-          .with('REFRESH MATERIALIZED VIEW materialized_view_dependencies')
-      expect(dummy_connection).to have_received(:execute).with("SELECT replace_view('foo', $$SELECT * FROM bar$$)")
+  describe '#refresh_materialized_view' do
+    it 'refreshs the passed view name' do
+      subject.refresh_materialized_view('foo')
+      expect(dummy_connection).to have_received(:execute).with('REFRESH MATERIALIZED VIEW foo')
     end
   end
 
@@ -64,13 +54,10 @@ describe Viewy::DependencyManager do
     before do
       allow(Viewy::Models::MaterializedViewDependency).to receive(:all).and_return all_dependencies
     end
-    it 'returns the names of the materialized views in the order in which they should be refreshed' do
+    it 'refreshes the materialized views in the order in which they should be refreshed' do
       expected_order = %w(baz bar foo buzz)
 
       subject.refresh_all_materialized_views
-
-      expect(dummy_connection).to have_received(:execute)
-          .with('REFRESH MATERIALIZED VIEW materialized_view_dependencies').ordered
 
       expected_order.each do |view_name|
         expect(dummy_connection).to have_received(:execute).with("REFRESH MATERIALIZED VIEW #{view_name}").ordered
