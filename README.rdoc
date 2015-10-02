@@ -1,3 +1,5 @@
 = Viewy
 
+= NOTE this is only for use with postgres 9.4 or higher.  
+
 This project rocks and uses MIT-LICENSE.
