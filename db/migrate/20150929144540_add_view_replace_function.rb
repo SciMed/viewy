@@ -45,6 +45,7 @@ class AddViewReplaceFunction < ActiveRecord::Migration
                 create_statements = create_statements || current_statement;
               END IF;
             END LOOP;
+            ALTER EVENT TRIGGER view_dependencies_update DISABLE;
             SELECT
               (
                 CASE
@@ -60,6 +61,7 @@ class AddViewReplaceFunction < ActiveRecord::Migration
             FOREACH current_statement IN ARRAY create_statements LOOP
               EXECUTE current_statement;
             END LOOP;
+            ALTER EVENT TRIGGER view_dependencies_update ENABLE ALWAYS;
           END;
       $$ LANGUAGE plpgsql;
     SQL
