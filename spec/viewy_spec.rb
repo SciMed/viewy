@@ -28,7 +28,9 @@ describe Viewy do
     it 'refreshes the materialized_view_dependencies view' do
       described_class.refresh_all_dependency_information
       expect(dummy_connection).to have_received(:execute)
-          .with('REFRESH MATERIALIZED VIEW all_view_dependencies')
+          .with('REFRESH MATERIALIZED VIEW materialized_view_dependencies').ordered
+      expect(dummy_connection).to have_received(:execute)
+          .with('REFRESH MATERIALIZED VIEW all_view_dependencies').ordered
     end
   end
   describe '.connection' do

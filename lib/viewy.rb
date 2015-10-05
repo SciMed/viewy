@@ -25,6 +25,7 @@ module Viewy
   # @return [PG::Result] the result of the refresh statement on the materialized view
   def self.refresh_all_dependency_information
     view_refresher = Viewy::DependencyManagement::ViewRefresher.new(connection)
+    view_refresher.refresh_materialized_view('materialized_view_dependencies')
     view_refresher.refresh_materialized_view('all_view_dependencies')
   end
 
