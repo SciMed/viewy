@@ -7,22 +7,12 @@ describe Viewy::DependencyManager do
   end
 
   before do
-    allow_any_instance_of(described_class).to receive(:connection).and_return(dummy_connection)
-  end
-
-  describe 'initialization' do
-    it 'refreshes the materialized_view_dependencies view' do
-      described_class.new
-      expect(dummy_connection).to have_received(:execute)
-          .with('REFRESH MATERIALIZED VIEW materialized_view_dependencies')
-    end
+    allow(Viewy).to receive(:connection).and_return(dummy_connection)
   end
 
   describe '#replace_view' do
     it 'uses the replace_view SQL function to replace the passed view name with teh provided view SQL' do
       subject.replace_view('foo', 'SELECT * FROM bar')
-      expect(dummy_connection).to have_received(:execute)
-          .with('REFRESH MATERIALIZED VIEW materialized_view_dependencies')
       expect(dummy_connection).to have_received(:execute).with("SELECT replace_view('foo', $$SELECT * FROM bar$$)")
     end
   end
@@ -68,9 +58,6 @@ describe Viewy::DependencyManager do
       expected_order = %w(baz bar foo buzz)
 
       subject.refresh_all_materialized_views
-
-      expect(dummy_connection).to have_received(:execute)
-          .with('REFRESH MATERIALIZED VIEW materialized_view_dependencies').ordered
 
       expected_order.each do |view_name|
         expect(dummy_connection).to have_received(:execute).with("REFRESH MATERIALIZED VIEW #{view_name}").ordered

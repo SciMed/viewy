@@ -3,11 +3,6 @@ module Viewy
   #
   # NOTE: the dependencies view is refreshed when an instance is initialized and this can take a little while to run.
   class DependencyManager
-    # @param connection [ActiveRecord::ConnectionAdapters::PostgreSQLAdapter] An ActiveRecord connection
-    #   to a Postgres Database
-    def initialize
-      view_refresher.refresh_materialized_view('materialized_view_dependencies')
-    end
 
     # This method will refresh all materialized views in order of dependency
     #
@@ -33,18 +28,12 @@ module Viewy
     # @raise [ActiveRecord::StatementInvalidError] raised if a dependent view is somehow not refreshed correctly
     # @return [PG::Result] the result of the refresh statement on the materialized view
     def replace_view(view_name, new_definition_sql)
-      connection.execute("SELECT replace_view('#{view_name}', $$#{new_definition_sql}$$)")
+      Viewy.connection.execute("SELECT replace_view('#{view_name}', $$#{new_definition_sql}$$)")
     end
 
     # @return [Viewy::DependencyManagement::ViewRefresher] a memoized view refresher object
     private def view_refresher
-      @view_refresher ||= Viewy::DependencyManagement::ViewRefresher.new(connection)
-    end
-
-    # @return [ActiveRecord::ConnectionAdapters::PostgreSQLAdapter] An ActiveRecord connection
-    #   to a Postgres Database
-    private def connection
-      ActiveRecord::Base.connection
+      @view_refresher ||= Viewy::DependencyManagement::ViewRefresher.new(Viewy.connection)
     end
   end
 end
