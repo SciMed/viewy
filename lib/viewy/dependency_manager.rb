@@ -8,6 +8,7 @@ module Viewy
     #
     # @raise [ActiveRecord::StatementInvalidError] raised if a view is somehow not refreshed correctly
     def refresh_all_materialized_views
+      Viewy.refresh_materialized_dependency_information
       view_refresher.refresh_all_materialized_views
     end
 

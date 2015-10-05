@@ -53,6 +53,11 @@ describe Viewy::DependencyManager do
     end
     before do
       allow(Viewy::Models::MaterializedViewDependency).to receive(:all).and_return all_dependencies
+      allow(Viewy).to receive(:refresh_materialized_dependency_information)
+    end
+    it 'refreshes the materialized view dependency information' do
+      subject.refresh_all_materialized_views
+      expect(Viewy).to have_received(:refresh_materialized_dependency_information)
     end
     it 'returns the names of the materialized views in the order in which they should be refreshed' do
       expected_order = %w(baz bar foo buzz)

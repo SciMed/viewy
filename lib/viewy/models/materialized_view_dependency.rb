@@ -1,6 +1,6 @@
 module Viewy
   module Models
-    # Provides a means of accessing information about view dependencies from within a Rails app.
+    # Provides a means of accessing information about view dependencies for a materialized view from within a Rails app.
     # The foreign key of the dependency information table is the name of the view that a user needs
     # dependency information about.
     class MaterializedViewDependency < ActiveRecord::Base

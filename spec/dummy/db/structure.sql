@@ -19,11 +19,15 @@ CREATE FUNCTION refresh_materialized_view_dependencies() RETURNS event_trigger
     LANGUAGE plpgsql
     AS $$
         DECLARE
-          view_exists BOOLEAN := (SELECT TRUE FROM pg_class WHERE pg_class.relname = 'materialized_view_dependencies' AND pg_class.relkind = 'm');
+          materialized_dependencies_exists BOOLEAN := (SELECT TRUE FROM pg_class WHERE pg_class.relname = 'materialized_view_dependencies' AND pg_class.relkind = 'm');
+          all_dependencies_exists BOOLEAN := (SELECT TRUE FROM pg_class WHERE pg_class.relname = 'all_view_dependencies' AND pg_class.relkind = 'm');
         BEGIN
           RAISE NOTICE 'refreshing view dependency hierarchy';
-          IF view_exists THEN
+          IF materialized_dependencies_exists THEN
             REFRESH MATERIALIZED VIEW materialized_view_dependencies;
+          END IF;
+          IF all_dependencies_exists THEN
+            REFRESH MATERIALIZED VIEW all_view_dependencies;
           END IF;
         END
       $$;
@@ -142,16 +146,28 @@ SET default_tablespace = '';
 --
 
 CREATE MATERIALIZED VIEW materialized_view_dependencies AS
+ SELECT pg_matviews.matviewname AS view_name,
+    view_dependencies(pg_matviews.matviewname) AS view_dependencies,
+    true AS materialized_view
+   FROM pg_matviews
+  WHERE ((pg_matviews.matviewname <> 'materialized_view_dependencies'::name) AND (pg_matviews.matviewname <> 'all_view_dependencies'::name))
+  WITH NO DATA;
+
+
+--
+-- Name: all_view_dependencies; Type: MATERIALIZED VIEW; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE MATERIALIZED VIEW all_view_dependencies AS
  WITH normal_view_dependencies AS (
          SELECT pg_views.viewname AS view_name,
             view_dependencies(pg_views.viewname) AS view_dependencies
            FROM pg_views
         )
- SELECT pg_matviews.matviewname AS view_name,
-    view_dependencies(pg_matviews.matviewname) AS view_dependencies,
-    true AS materialized_view
-   FROM pg_matviews
-  WHERE (pg_matviews.matviewname <> 'materialized_view_dependencies'::name)
+ SELECT materialized_view_dependencies.view_name,
+    materialized_view_dependencies.view_dependencies,
+    materialized_view_dependencies.materialized_view
+   FROM materialized_view_dependencies
 UNION
  SELECT normal_view_dependencies.view_name,
     normal_view_dependencies.view_dependencies,
@@ -197,4 +213,6 @@ SET search_path TO public;
 INSERT INTO schema_migrations (version) VALUES ('20150929144540');
 
 INSERT INTO schema_migrations (version) VALUES ('20150929205301');
+
+INSERT INTO schema_migrations (version) VALUES ('20151005150022');
 

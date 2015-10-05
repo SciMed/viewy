@@ -9,13 +9,23 @@ require 'viewy/dependency_manager'
 # of views and their dependencies
 module Viewy
   # Calling this method will refresh the materialized view that stores the dependency information for other
+  # materialized views in the system
+  #
+  # @raise [ActiveRecord::StatementInvalidError] raised if a dependent view is somehow not refreshed correctly
+  # @return [PG::Result] the result of the refresh statement on the materialized view
+  def self.refresh_materialized_dependency_information
+    view_refresher = Viewy::DependencyManagement::ViewRefresher.new(connection)
+    view_refresher.refresh_materialized_view('materialized_view_dependencies')
+  end
+
+  # Calling this method will refresh the materialized view that stores the dependency information for other
   # views in the system
   #
   # @raise [ActiveRecord::StatementInvalidError] raised if a dependent view is somehow not refreshed correctly
   # @return [PG::Result] the result of the refresh statement on the materialized view
-  def self.refresh_dependency_information
+  def self.refresh_all_dependency_information
     view_refresher = Viewy::DependencyManagement::ViewRefresher.new(connection)
-    view_refresher.refresh_materialized_view('materialized_view_dependencies')
+    view_refresher.refresh_materialized_view('all_view_dependencies')
   end
 
   # The connection used by viewy to manage views
