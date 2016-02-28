@@ -1,10 +1,7 @@
 require 'rails_helper'
 
-describe Viewy::DependencyManagement::ViewRefresher do
-  let(:dummy_connection) do
-    double 'SomeConnection',
-      execute: true
-  end
+describe Viewy::DependencyManagement::ViewSorter do
+
   let(:dependency_1) do
     instance_double 'Viewy::Models::MaterializedViewDependency',
       view_name: 'foo',
@@ -35,34 +32,32 @@ describe Viewy::DependencyManagement::ViewRefresher do
       view_dependencies: %w(bar baz),
       materialized_view: false
   end
-  let(:all_dependencies) do
+  let(:dependency_6) do
+    instance_double 'Viewy::Models::MaterializedViewDependency',
+      view_name: 'blam',
+      view_dependencies: %w(baz),
+      materialized_view: false
+  end
+  let(:all_materialized_dependencies) do
     [dependency_1, dependency_2, dependency_3, dependency_4, dependency_5]
   end
+  let(:all_dependencies) do
+    [dependency_1, dependency_2, dependency_3, dependency_4, dependency_5, dependency_6]
+  end
   before do
-    allow(Viewy::Models::MaterializedViewDependency).to receive(:all).and_return all_dependencies
+    allow(Viewy::Models::MaterializedViewDependency).to receive(:all).and_return all_materialized_dependencies
+    allow(Viewy::Models::ViewDependency).to receive(:all).and_return all_dependencies
   end
 
-  subject do
-    described_class.new(dummy_connection)
-  end
-
-  describe '#refresh_materialized_view' do
-    it 'refreshs the passed view name' do
-      subject.refresh_materialized_view('foo')
-      expect(dummy_connection).to have_received(:execute).with('REFRESH MATERIALIZED VIEW foo')
+  describe '#sorted_views' do
+    it 'yields the views in the expected order' do
+      expect { |b| subject.sorted_views.each(&b) }.to yield_successive_args('baz', 'bar', 'foo', 'buzz', 'bang', 'blam')
     end
   end
 
-  describe '#refresh_all_materialized_views' do
-    it 'refreshes the materialized views in the order in which they should be refreshed' do
-      expected_order = %w(baz bar foo buzz)
-
-      subject.refresh_all_materialized_views
-
-      expected_order.each do |view_name|
-        expect(dummy_connection).to have_received(:execute).with("REFRESH MATERIALIZED VIEW #{view_name}").ordered
-      end
-      expect(dummy_connection).not_to have_received(:execute).with('REFRESH MATERIALIZED VIEW bang')
+  describe '#sorted_materialized_views' do
+    it 'yields the views in the expected order' do
+      expect { |b| subject.sorted_materialized_views.each(&b) }.to yield_successive_args('baz', 'bar', 'foo', 'buzz')
     end
   end
 end

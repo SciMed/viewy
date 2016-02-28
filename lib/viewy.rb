@@ -29,6 +29,16 @@ module Viewy
     view_refresher.refresh_materialized_view('all_view_dependencies')
   end
 
+  # @return [Array<String>] the ordered names of all views in the system in safe dependency order
+  def self.view_names_in_dependency_order
+    Viewy::DependencyManagement::ViewSorter.new.sorted_views
+  end
+
+  # @return [Array<String>] the ordered names of the materialized views in the system in safe dependency order
+  def self.materialized_view_names_in_dependency_order
+    Viewy::DependencyManagement::ViewSorter.new.sorted_materialized_views
+  end
+
   # The connection used by viewy to manage views
   #
   # @return [ActiveRecord::ConnectionAdapters::PostgreSQLAdapter] An ActiveRecord connection
