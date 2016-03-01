@@ -7,13 +7,25 @@ module Viewy
 
       # @return [Array<String>] the ordered names of all views in the system in safe dependency order
       def sorted_views
-        @views = generate_view_hash
+        @views = generate_view_hash(Viewy::Models::ViewDependency.all)
         tsort
       end
 
       # @return [Array<String>] the ordered names of the materialized views in the system in safe dependency order
       def sorted_materialized_views
-        @views = generate_materialized_view_hash
+        @views = generate_materialized_view_hash(Viewy::Models::MaterializedViewDependency.all)
+        tsort
+      end
+
+      # @return [Array<String>] the ordered names of the subset of views in the system in safe dependency order
+      def sorted_view_subset(view_names:)
+        @views = generate_view_hash(Viewy::Models::ViewDependency.where(view_name: view_names))
+        tsort
+      end
+
+      # @return [Array<String>] the ordered names of the subset of materialized views in safe dependency order
+      def sorted_materialized_view_subset(view_names:)
+        @views = generate_materialized_view_hash(Viewy::Models::MaterializedViewDependency.where(view_name: view_names))
         tsort
       end
 
@@ -23,16 +35,16 @@ module Viewy
       end
 
       # @return [Hash] a hash with all view names as keys and their dependencies as an array of names
-      private def generate_view_hash
-        views = Viewy::Models::ViewDependency.all.map do |dep|
+      private def generate_view_hash(view_collection)
+        views = view_collection.map do |dep|
           [dep.view_name, dep.view_dependencies]
         end
         Hash[views]
       end
 
       # @return [Hash] a hash with materialized view names as keys and their dependencies as an array of names
-      private def generate_materialized_view_hash
-        views = Viewy::Models::MaterializedViewDependency.all.select(&:materialized_view).map do |dep|
+      private def generate_materialized_view_hash(view_collection)
+        views = view_collection.select(&:materialized_view).map do |dep|
           [dep.view_name, dep.view_dependencies]
         end
         Hash[views]

@@ -12,8 +12,7 @@ module Viewy
       #
       # @return [PG::Result] the result of the refresh statement on the materialized view
       def refresh!
-        view_dep = Viewy::Models::MaterializedViewDependency.find(table_name)
-        view_dep.view_dependencies.each do |view_dependency|
+        sorted_view_dependencies.each do |view_dependency|
           ActiveRecord::Base.connection.execute("REFRESH MATERIALIZED VIEW #{view_dependency}")
         end
         refresh_without_dependencies!
@@ -26,6 +25,14 @@ module Viewy
       # @return [PG::Result] the result of the refresh statement on the materialized view
       def refresh_without_dependencies!
         ActiveRecord::Base.connection.execute("REFRESH MATERIALIZED VIEW #{table_name}")
+      end
+
+      # Provides an array of sorted view depenedencies
+      #
+      # @return [Array<String>]
+      def sorted_view_dependencies
+        view_dep = Viewy::Models::MaterializedViewDependency.find(table_name)
+        Viewy::DependencyManagement::ViewSorter.new.sorted_materialized_view_subset(view_names: view_dep.view_dependencies)
       end
     end
   end

@@ -60,4 +60,36 @@ describe Viewy::DependencyManagement::ViewSorter do
       expect { |b| subject.sorted_materialized_views.each(&b) }.to yield_successive_args('baz', 'bar', 'foo', 'buzz')
     end
   end
+
+  describe '#sorted_view_subset' do
+    let(:some_dependencies) do
+      [dependency_1, dependency_3, dependency_6, dependency_2]
+    end
+
+    before do
+      allow(Viewy::Models::ViewDependency).to receive(:where).and_return(some_dependencies)
+    end
+
+    it 'sorts the set of views' do
+      name_param = %w(bar foo blam baz)
+      expect(subject.sorted_view_subset(view_names: name_param)).to eql %w(baz bar foo blam)
+      expect(Viewy::Models::ViewDependency).to have_received(:where).with(view_name: name_param)
+    end
+  end
+
+  describe '#sorted_materialized_view_subset' do
+    let(:some_dependencies) do
+      [dependency_1, dependency_3, dependency_2]
+    end
+
+    before do
+      allow(Viewy::Models::MaterializedViewDependency).to receive(:where).and_return(some_dependencies)
+    end
+
+    it 'sorts the set of views' do
+      name_param = %w(bar foo baz)
+      expect(subject.sorted_materialized_view_subset(view_names: name_param)).to eql %w(baz bar foo)
+      expect(Viewy::Models::MaterializedViewDependency).to have_received(:where).with(view_name: name_param)
+    end
+  end
 end
