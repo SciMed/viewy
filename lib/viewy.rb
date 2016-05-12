@@ -4,6 +4,7 @@ require 'viewy/acts_as_view'
 require 'viewy/acts_as_materialized_view'
 require 'viewy/dependency_management'
 require 'viewy/dependency_manager'
+require 'viewy/event_triggers'
 
 # Viewy provides a means of interacting with views in a Postgres database in a way that allows the manipulation
 # of views and their dependencies

@@ -19,7 +19,7 @@ development:
   database: viewy_development
   username: <%= ENV['POSTGRES_USER'] %>
   password: <%= ENV['POSTGRES_PASS'] %>
-  host: <%= ENV['APP_HOST'] %>
+  host: localhost
   port: <%= ENV['APP_PORT'] %>
   schema_search_path: public
 
@@ -30,7 +30,7 @@ test:
   database: viewy_test
   username: <%= ENV['POSTGRES_USER'] %>
   password: <%= ENV['POSTGRES_PASS'] %>
-  host: <%= ENV['APP_HOST'] %>
+  host: localhost
   port: <%= ENV['APP_PORT'] %>
   schema_search_path: public
 
