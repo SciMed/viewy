@@ -77,7 +77,7 @@ CREATE FUNCTION replace_view(view_name text, new_sql text) RETURNS void
                     WHEN (SELECT TRUE FROM pg_views WHERE viewname = relname) THEN
                       'CREATE OR REPLACE VIEW ' || pg_class.relname || ' AS ' || pg_get_viewdef(oid)
                     WHEN (SELECT TRUE FROM pg_matviews WHERE matviewname = relname) THEN
-                      'CREATE MATERIALIZED VIEW ' || pg_class.relname || ' AS ' || pg_get_viewdef(oid) || ' WITH NO DATA'
+                      'CREATE MATERIALIZED VIEW ' || pg_class.relname || ' AS ' || TRIM(TRAILING ';' FROM pg_get_viewdef(oid)) || ' WITH NO DATA'
                   END)
               INTO current_statement
               FROM pg_class
