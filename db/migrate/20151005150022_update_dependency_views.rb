@@ -42,8 +42,8 @@ class UpdateDependencyViews < ActiveRecord::Migration
 
   def down
     dependency_sql = <<-SQL
-      DROP MATERIALIZED VIEW materialized_view_dependencies;
       DROP MATERIALIZED VIEW all_view_dependencies;
+      DROP MATERIALIZED VIEW materialized_view_dependencies;
 
       CREATE MATERIALIZED VIEW materialized_view_dependencies AS
         WITH normal_view_dependencies AS (
