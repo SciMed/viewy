@@ -2,12 +2,16 @@
 -- PostgreSQL database dump
 --
 
+-- Dumped from database version 9.5.2
+-- Dumped by pg_dump version 9.5.2
+
 SET statement_timeout = 0;
 SET lock_timeout = 0;
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
 SET check_function_bodies = false;
 SET client_min_messages = warning;
+SET row_security = off;
 
 SET search_path = public, pg_catalog;
 
@@ -73,7 +77,7 @@ CREATE FUNCTION replace_view(view_name text, new_sql text) RETURNS void
                     WHEN (SELECT TRUE FROM pg_views WHERE viewname = relname) THEN
                       'CREATE OR REPLACE VIEW ' || pg_class.relname || ' AS ' || pg_get_viewdef(oid)
                     WHEN (SELECT TRUE FROM pg_matviews WHERE matviewname = relname) THEN
-                      'CREATE MATERIALIZED VIEW ' || pg_class.relname || ' AS ' || pg_get_viewdef(oid)
+                      'CREATE MATERIALIZED VIEW ' || pg_class.relname || ' AS ' || pg_get_viewdef(oid) || ' WITH NO DATA'
                   END)
               INTO current_statement
               FROM pg_class
@@ -83,6 +87,7 @@ CREATE FUNCTION replace_view(view_name text, new_sql text) RETURNS void
                 create_statements = create_statements || current_statement;
               END IF;
             END LOOP;
+            ALTER EVENT TRIGGER view_dependencies_update DISABLE;
             SELECT
               (
                 CASE
@@ -98,6 +103,7 @@ CREATE FUNCTION replace_view(view_name text, new_sql text) RETURNS void
             FOREACH current_statement IN ARRAY create_statements LOOP
               EXECUTE current_statement;
             END LOOP;
+            ALTER EVENT TRIGGER view_dependencies_update ENABLE ALWAYS;
           END;
       $$;
 
@@ -142,7 +148,7 @@ CREATE FUNCTION view_dependencies(materialized_view name) RETURNS name[]
 SET default_tablespace = '';
 
 --
--- Name: materialized_view_dependencies; Type: MATERIALIZED VIEW; Schema: public; Owner: -; Tablespace: 
+-- Name: materialized_view_dependencies; Type: MATERIALIZED VIEW; Schema: public; Owner: -
 --
 
 CREATE MATERIALIZED VIEW materialized_view_dependencies AS
@@ -155,7 +161,7 @@ CREATE MATERIALIZED VIEW materialized_view_dependencies AS
 
 
 --
--- Name: all_view_dependencies; Type: MATERIALIZED VIEW; Schema: public; Owner: -; Tablespace: 
+-- Name: all_view_dependencies; Type: MATERIALIZED VIEW; Schema: public; Owner: -
 --
 
 CREATE MATERIALIZED VIEW all_view_dependencies AS
@@ -180,7 +186,7 @@ UNION
 SET default_with_oids = false;
 
 --
--- Name: schema_migrations; Type: TABLE; Schema: public; Owner: -; Tablespace: 
+-- Name: schema_migrations; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE schema_migrations (
@@ -189,19 +195,10 @@ CREATE TABLE schema_migrations (
 
 
 --
--- Name: unique_schema_migrations; Type: INDEX; Schema: public; Owner: -; Tablespace: 
+-- Name: unique_schema_migrations; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX unique_schema_migrations ON schema_migrations USING btree (version);
-
-
---
--- Name: view_dependencies_update; Type: EVENT TRIGGER; Schema: -; Owner: -
---
-
-CREATE EVENT TRIGGER view_dependencies_update ON ddl_command_end 
-         WHEN TAG IN ('DROP VIEW', 'DROP MATERIALIZED VIEW', 'CREATE VIEW', 'CREATE MATERIALIZED VIEW', 'ALTER VIEW', 'ALTER MATERIALIZED VIEW') 
-   EXECUTE PROCEDURE public.refresh_materialized_view_dependencies();
 
 
 --
@@ -216,3 +213,10 @@ INSERT INTO schema_migrations (version) VALUES ('20150929205301');
 
 INSERT INTO schema_migrations (version) VALUES ('20151005150022');
 
+INSERT INTO schema_migrations (version) VALUES ('20160512173021');
+
+
+        CREATE EVENT TRIGGER view_dependencies_update
+        ON DDL_COMMAND_END
+        WHEN TAG IN ('DROP VIEW', 'DROP MATERIALIZED VIEW', 'CREATE VIEW', 'CREATE MATERIALIZED VIEW', 'ALTER VIEW', 'ALTER MATERIALIZED VIEW')
+        EXECUTE PROCEDURE refresh_materialized_view_dependencies();
