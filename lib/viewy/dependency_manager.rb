@@ -28,8 +28,9 @@ module Viewy
     #
     # @raise [ActiveRecord::StatementInvalidError] raised if a dependent view is somehow not refreshed correctly
     # @return [PG::Result] the result of the refresh statement on the materialized view
-    def replace_view(view_name, new_definition_sql)
+    def replace_view(view_name, new_definition_sql, &block)
       Viewy.connection.execute("SELECT replace_view('#{view_name}', $$#{new_definition_sql}$$)")
+      block.call if block_given?
     end
 
     # @return [Viewy::DependencyManagement::ViewRefresher] a memoized view refresher object

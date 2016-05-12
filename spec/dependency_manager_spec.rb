@@ -11,9 +11,19 @@ describe Viewy::DependencyManager do
   end
 
   describe '#replace_view' do
+    let(:dummy_model) do
+      double 'SomeMaterializedViewModel',
+        refresh!: true
+    end
     it 'uses the replace_view SQL function to replace the passed view name with teh provided view SQL' do
       subject.replace_view('foo', 'SELECT * FROM bar')
       expect(dummy_connection).to have_received(:execute).with("SELECT replace_view('foo', $$SELECT * FROM bar$$)")
+    end
+    it 'accepts a post-replace callback block' do
+      subject.replace_view('foo', 'SELECT * FROM bar') do
+        dummy_model.refresh!
+      end
+      expect(dummy_model).to have_received(:refresh!)
     end
   end
 
