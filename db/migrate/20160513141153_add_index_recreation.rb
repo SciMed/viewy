@@ -72,12 +72,16 @@ class AddIndexRecreation < ActiveRecord::Migration
             FOREACH current_statement IN ARRAY create_statements LOOP
               EXECUTE current_statement;
             END LOOP;
-            FOREACH current_index_statement IN ARRAY index_statements LOOP
-              EXECUTE current_index_statement;
-            END LOOP;
-            FOREACH current_index_statement IN ARRAY current_index_statements LOOP
-              EXECUTE current_index_statement;
-            END LOOP;
+            IF index_statements IS NOT NULL THEN
+              FOREACH current_index_statement IN ARRAY index_statements LOOP
+                EXECUTE current_index_statement;
+              END LOOP;
+            END IF;
+            IF current_index_statements IS NOT NULL THEN
+              FOREACH current_index_statement IN ARRAY current_index_statements LOOP
+                EXECUTE current_index_statement;
+              END LOOP;
+            END IF;
             ALTER EVENT TRIGGER view_dependencies_update ENABLE ALWAYS;
           END;
       $$ LANGUAGE plpgsql;
