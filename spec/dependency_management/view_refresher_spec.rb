@@ -47,9 +47,39 @@ describe Viewy::DependencyManagement::ViewRefresher do
   end
 
   describe '#refresh_materialized_view' do
-    it 'refreshs the passed view name' do
+    it 'refreshes the passed view name' do
       subject.refresh_materialized_view('foo')
       expect(dummy_connection).to have_received(:execute).with('REFRESH MATERIALIZED VIEW foo')
+    end
+    context 'concurrently' do
+      it 'adds the `CONCURRENTLY` modifier to the refresh query' do
+        subject.refresh_materialized_view('foo', concurrently: true)
+        expect(dummy_connection).to have_received(:execute).with('REFRESH MATERIALIZED VIEW CONCURRENTLY foo')
+      end
+    end
+    context 'with dependencies' do
+      before do
+        allow(Viewy::Models::MaterializedViewDependency).to receive(:find).with('foo').and_return(dependency_1)
+        allow(Viewy::Models::MaterializedViewDependency).to receive(:where).with(view_name: %w(bar baz)).and_return([dependency_2, dependency_3])
+      end
+      it 'refreshes views with dependencies' do
+        subject.refresh_materialized_view('foo', with_dependencies: true)
+        expect(dummy_connection).to have_received(:execute).with('REFRESH MATERIALIZED VIEW baz').ordered
+        expect(dummy_connection).to have_received(:execute).with('REFRESH MATERIALIZED VIEW bar').ordered
+        expect(dummy_connection).to have_received(:execute).with('REFRESH MATERIALIZED VIEW foo').ordered
+      end
+    end
+    context 'with dependencies concurrently' do
+      before do
+        allow(Viewy::Models::MaterializedViewDependency).to receive(:find).with('foo').and_return(dependency_1)
+        allow(Viewy::Models::MaterializedViewDependency).to receive(:where).with(view_name: %w(bar baz)).and_return([dependency_2, dependency_3])
+      end
+      it 'refreshes views with dependencies' do
+        subject.refresh_materialized_view('foo', with_dependencies: true, concurrently: true)
+        expect(dummy_connection).to have_received(:execute).with('REFRESH MATERIALIZED VIEW CONCURRENTLY baz').ordered
+        expect(dummy_connection).to have_received(:execute).with('REFRESH MATERIALIZED VIEW CONCURRENTLY bar').ordered
+        expect(dummy_connection).to have_received(:execute).with('REFRESH MATERIALIZED VIEW CONCURRENTLY foo').ordered
+      end
     end
   end
 

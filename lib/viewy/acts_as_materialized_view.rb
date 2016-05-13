@@ -11,11 +11,9 @@ module Viewy
       # @raise [ActiveRecord::StatementInvalidError] raised if a dependent view is somehow not refreshed correctly
       #
       # @return [PG::Result] the result of the refresh statement on the materialized view
-      def refresh!
-        sorted_view_dependencies.each do |view_dependency|
-          ActiveRecord::Base.connection.execute("REFRESH MATERIALIZED VIEW #{view_dependency}")
-        end
-        refresh_without_dependencies!
+      def refresh!(concurrently: false)
+        refresher = Viewy::DependencyManagement::ViewRefresher.new(Viewy.connection)
+        refresher.refresh_materialized_view(table_name, with_dependencies: true, concurrently: concurrently)
       end
 
       # Refreshes this view without refreshing any dependencies
@@ -23,11 +21,12 @@ module Viewy
       # @raise [ActiveRecord::StatementInvalidError] raised if a dependent view is somehow not refreshed correctly
       #
       # @return [PG::Result] the result of the refresh statement on the materialized view
-      def refresh_without_dependencies!
-        ActiveRecord::Base.connection.execute("REFRESH MATERIALIZED VIEW #{table_name}")
+      def refresh_without_dependencies!(concurrently: false)
+        refresher = Viewy::DependencyManagement::ViewRefresher.new(Viewy.connection)
+        refresher.refresh_materialized_view(table_name, with_dependencies: false, concurrently: concurrently)
       end
 
-      # Provides an array of sorted view depenedencies
+      # Provides an array of sorted view dependencies
       #
       # @return [Array<String>]
       def sorted_view_dependencies
