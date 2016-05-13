@@ -67,7 +67,10 @@ CREATE FUNCTION replace_view(view_name text, new_sql text) RETURNS void
               ) ordered_dependents
             );
             create_statements TEXT[] := '{}';
+            index_statements TEXT[] := '{}';
+            current_index_statements TEXT[] := '{}';
             current_statement TEXT;
+            current_index_statement TEXT;
             view_drop_statement TEXT;
             object_id INT;
           BEGIN
@@ -85,9 +88,17 @@ CREATE FUNCTION replace_view(view_name text, new_sql text) RETURNS void
                     AND pg_class.relname != view_name;
               IF current_statement IS NOT NULL THEN
                 create_statements = create_statements || current_statement;
+                SELECT INTO current_index_statements array_agg(pg_indexes.indexdef)
+                  FROM pg_indexes
+                    JOIN pg_class ON pg_class.relname = pg_indexes.tablename
+                  WHERE pg_class.OID = object_id;
+                index_statements := array_cat(index_statements,  current_index_statements);
               END IF;
             END LOOP;
             ALTER EVENT TRIGGER view_dependencies_update DISABLE;
+            SELECT INTO current_index_statements array_agg(pg_indexes.indexdef)
+              FROM pg_indexes
+              WHERE pg_indexes.tablename = view_name;
             SELECT
               (
                 CASE
@@ -102,6 +113,12 @@ CREATE FUNCTION replace_view(view_name text, new_sql text) RETURNS void
             EXECUTE new_sql;
             FOREACH current_statement IN ARRAY create_statements LOOP
               EXECUTE current_statement;
+            END LOOP;
+            FOREACH current_index_statement IN ARRAY index_statements LOOP
+              EXECUTE current_index_statement;
+            END LOOP;
+            FOREACH current_index_statement IN ARRAY current_index_statements LOOP
+              EXECUTE current_index_statement;
             END LOOP;
             ALTER EVENT TRIGGER view_dependencies_update ENABLE ALWAYS;
           END;
@@ -214,6 +231,8 @@ INSERT INTO schema_migrations (version) VALUES ('20150929205301');
 INSERT INTO schema_migrations (version) VALUES ('20151005150022');
 
 INSERT INTO schema_migrations (version) VALUES ('20160512173021');
+
+INSERT INTO schema_migrations (version) VALUES ('20160513141153');
 
 
         CREATE EVENT TRIGGER view_dependencies_update
