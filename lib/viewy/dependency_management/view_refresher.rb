@@ -42,7 +42,29 @@ module Viewy
       end
 
       private def refresh_single_view(view_name, concurrently:)
-        connection.execute(refresh_sql(view_name, concurrently))
+        begin
+          connection.execute(refresh_sql(view_name, concurrently))
+        rescue ActiveRecord::StatementInvalid => ex
+          if attempt_non_concurrent_refresh?(ex, concurrently)
+            connection.execute(refresh_sql(view_name, false))
+          end
+        end
+      end
+
+      # @param ex [ActiveRecord::StatementInvalid] an exception raised during the view refresh
+      # @param concurrently [Boolean] whether or not the refresh that raised the exception was concurrent
+      #
+      # @raise [ActiveRecord::StatementInvalid] re-raised if the original exception is not a FeatureNotSupported exception
+      #
+      # @return [Boolean] true if the system should attempt to refresh the view non-concurrently after a concurrent
+      #   refresh has failed.  Since Postgres raises an error when an unpopulated view is refreshed concurrently, this
+      #   allows the system to populated such views if needed
+      private def attempt_non_concurrent_refresh?(ex, concurrently)
+        if ex.original_exception.instance_of?(PG::FeatureNotSupported)
+          concurrently
+        else
+          raise ex
+        end
       end
 
       # @param name [String] the name of a materialized view

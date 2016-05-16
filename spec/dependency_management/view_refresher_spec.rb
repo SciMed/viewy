@@ -81,6 +81,37 @@ describe Viewy::DependencyManagement::ViewRefresher do
         expect(dummy_connection).to have_received(:execute).with('REFRESH MATERIALIZED VIEW CONCURRENTLY foo').ordered
       end
     end
+    context 'when a concurrent refresh fails' do
+      before do
+        allow(dummy_connection).to receive(:execute).with('REFRESH MATERIALIZED VIEW CONCURRENTLY bar').and_raise(statement_invalid)
+        allow(Viewy::Models::MaterializedViewDependency).to receive(:find).with('foo').and_return(dependency_1)
+        allow(Viewy::Models::MaterializedViewDependency).to receive(:where).with(view_name: %w(bar baz)).and_return([dependency_2, dependency_3])
+      end
+      context 'failure is because concurrent refresh failed' do
+        let(:statement_invalid) do
+          ActiveRecord::StatementInvalid.new('CONCURRENTLY failed on view', PG::FeatureNotSupported.new)
+        end
+
+        it 'refreshes the failed view non-concurrently' do
+          subject.refresh_materialized_view('foo', with_dependencies: true, concurrently: true)
+          expect(dummy_connection).to have_received(:execute).with('REFRESH MATERIALIZED VIEW CONCURRENTLY baz').ordered
+          expect(dummy_connection).to have_received(:execute).with('REFRESH MATERIALIZED VIEW CONCURRENTLY bar').ordered
+          expect(dummy_connection).to have_received(:execute).with('REFRESH MATERIALIZED VIEW bar').ordered
+          expect(dummy_connection).to have_received(:execute).with('REFRESH MATERIALIZED VIEW CONCURRENTLY foo').ordered
+        end
+      end
+      context 'failure is for another reason' do
+        let(:statement_invalid) do
+          ActiveRecord::StatementInvalid.new('Everything failed', RuntimeError.new)
+        end
+
+        it 'raises the error back to the caller' do
+          expect{
+            subject.refresh_materialized_view('foo', with_dependencies: true, concurrently: true)
+          }.to raise_error(ActiveRecord::StatementInvalid)
+        end
+      end
+    end
   end
 
   describe '#refresh_all_materialized_views' do
