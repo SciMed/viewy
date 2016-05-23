@@ -54,13 +54,18 @@ module Viewy
       # @param ex [ActiveRecord::StatementInvalid] an exception raised during the view refresh
       # @param concurrently [Boolean] whether or not the refresh that raised the exception was concurrent
       #
-      # @raise [ActiveRecord::StatementInvalid] re-raised if the original exception is not a FeatureNotSupported exception
+      # @raise [ActiveRecord::StatementInvalid] re-raised if the original exception does not indicate the refresh
+      #   should be retried non-concurrently
       #
       # @return [Boolean] true if the system should attempt to refresh the view non-concurrently after a concurrent
       #   refresh has failed.  Since Postgres raises an error when an unpopulated view is refreshed concurrently, this
       #   allows the system to populated such views if needed
       private def attempt_non_concurrent_refresh?(ex, concurrently)
-        if ex.original_exception.instance_of?(PG::FeatureNotSupported)
+        original_exception = ex.original_exception
+        should_retry_non_concurrently = original_exception.instance_of?(PG::FeatureNotSupported) ||
+          original_exception.instance_of?(PG::ObjectNotInPrerequisiteState)
+
+        if should_retry_non_concurrently
           concurrently
         else
           raise ex
