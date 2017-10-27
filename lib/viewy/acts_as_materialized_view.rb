@@ -33,6 +33,16 @@ module Viewy
         view_dep = Viewy::Models::MaterializedViewDependency.find(table_name)
         Viewy::DependencyManagement::ViewSorter.new.sorted_materialized_view_subset(view_names: view_dep.view_dependencies)
       end
+
+      # Determines if a view has been populated (i.e. is in a queryable state)
+      #
+      # @return [Boolean] true if the view has been populated, false if not
+      def populated?
+        result = connection.execute <<-SQL
+          SELECT ispopulated FROM pg_matviews WHERE matviewname = '#{self.table_name}';
+        SQL
+        ActiveRecord::Type::Boolean.new.type_cast_from_user(result.values[0][0])
+      end
     end
   end
 end
