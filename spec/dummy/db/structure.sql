@@ -2,11 +2,12 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 9.5.2
--- Dumped by pg_dump version 9.5.2
+-- Dumped from database version 9.6.5
+-- Dumped by pg_dump version 10.0
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
 SET check_function_bodies = false;
@@ -114,12 +115,16 @@ CREATE FUNCTION replace_view(view_name text, new_sql text) RETURNS void
             FOREACH current_statement IN ARRAY create_statements LOOP
               EXECUTE current_statement;
             END LOOP;
-            FOREACH current_index_statement IN ARRAY index_statements LOOP
-              EXECUTE current_index_statement;
-            END LOOP;
-            FOREACH current_index_statement IN ARRAY current_index_statements LOOP
-              EXECUTE current_index_statement;
-            END LOOP;
+            IF index_statements IS NOT NULL THEN
+              FOREACH current_index_statement IN ARRAY index_statements LOOP
+                EXECUTE current_index_statement;
+              END LOOP;
+            END IF;
+            IF current_index_statements IS NOT NULL THEN
+              FOREACH current_index_statement IN ARRAY current_index_statements LOOP
+                EXECUTE current_index_statement;
+              END LOOP;
+            END IF;
             ALTER EVENT TRIGGER view_dependencies_update ENABLE ALWAYS;
           END;
       $$;
@@ -200,6 +205,169 @@ UNION
   WITH NO DATA;
 
 
+--
+-- Name: mat_view_1; Type: MATERIALIZED VIEW; Schema: public; Owner: -
+--
+
+CREATE MATERIALIZED VIEW mat_view_1 AS
+ SELECT 'M1'::text AS label,
+    'M1'::text AS name,
+    1 AS code
+  WITH NO DATA;
+
+
+--
+-- Name: mat_view_2; Type: MATERIALIZED VIEW; Schema: public; Owner: -
+--
+
+CREATE MATERIALIZED VIEW mat_view_2 AS
+ SELECT 'M2'::text AS label,
+    'M2'::text AS name,
+    2 AS code
+  WITH NO DATA;
+
+
+--
+-- Name: mat_view_3; Type: MATERIALIZED VIEW; Schema: public; Owner: -
+--
+
+CREATE MATERIALIZED VIEW mat_view_3 AS
+ SELECT (mv1.label || ' + M3'::text) AS label,
+    mv1.code AS old_code,
+    (((mv1.code)::text || '3'::text))::integer AS code
+   FROM mat_view_1 mv1
+  WITH NO DATA;
+
+
+--
+-- Name: view_1; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW view_1 AS
+ SELECT (mv2.label || ' + V1'::text) AS label,
+    mv2.code,
+    'V1'::text AS name
+   FROM mat_view_2 mv2;
+
+
+--
+-- Name: mat_view_4; Type: MATERIALIZED VIEW; Schema: public; Owner: -
+--
+
+CREATE MATERIALIZED VIEW mat_view_4 AS
+ SELECT v1.code AS old_code,
+    (v1.label || ' + M4'::text) AS label,
+    (((v1.code)::text || '4'::text))::integer AS code,
+    'M4'::text AS name
+   FROM view_1 v1
+  WITH NO DATA;
+
+
+--
+-- Name: mat_view_5; Type: MATERIALIZED VIEW; Schema: public; Owner: -
+--
+
+CREATE MATERIALIZED VIEW mat_view_5 AS
+ SELECT (((mv3.code)::text || '5'::text))::integer AS code,
+    (mv3.label || ' + M5'::text) AS label,
+    mv3.code AS old_code,
+    'M5'::text AS name
+   FROM mat_view_3 mv3
+  WITH NO DATA;
+
+
+--
+-- Name: view_2; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW view_2 AS
+ SELECT 'V2'::text AS label,
+    222 AS code,
+    'V2'::text AS name;
+
+
+--
+-- Name: mat_view_6; Type: MATERIALIZED VIEW; Schema: public; Owner: -
+--
+
+CREATE MATERIALIZED VIEW mat_view_6 AS
+ SELECT v2.code AS old_code,
+    (v2.label || ' + M6'::text) AS label,
+    (((v2.code)::text || '6'::text))::integer AS code,
+    'M6'::text AS name
+   FROM view_2 v2
+  WITH NO DATA;
+
+
+--
+-- Name: view_3; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW view_3 AS
+ SELECT (mv3.label || ' + V3'::text) AS label,
+    mv3.code,
+    mv3.old_code,
+    'V3'::text AS name
+   FROM mat_view_3 mv3;
+
+
+--
+-- Name: mat_view_7; Type: MATERIALIZED VIEW; Schema: public; Owner: -
+--
+
+CREATE MATERIALIZED VIEW mat_view_7 AS
+ SELECT (((v3.code)::text || '7'::text))::integer AS code,
+    (v3.label || ' + M7'::text) AS label,
+    v3.code AS old_code,
+    'M7'::text AS name
+   FROM view_3 v3
+UNION
+ SELECT (((mv4.code)::text || '7'::text))::integer AS code,
+    (mv4.label || ' + M7'::text) AS label,
+    mv4.code AS old_code,
+    'M7'::text AS name
+   FROM mat_view_4 mv4
+  WITH NO DATA;
+
+
+--
+-- Name: mat_view_8; Type: MATERIALIZED VIEW; Schema: public; Owner: -
+--
+
+CREATE MATERIALIZED VIEW mat_view_8 AS
+ SELECT (((mv5.code)::text || '8'::text))::integer AS code,
+    (mv5.label || ' + M8'::text) AS label,
+    mv5.code AS old_code,
+    'M8'::text AS name
+   FROM mat_view_5 mv5
+UNION
+ SELECT (((mv6.code)::text || '8'::text))::integer AS code,
+    (mv6.label || ' + M8'::text) AS label,
+    mv6.code AS old_code,
+    'M8'::text AS name
+   FROM mat_view_6 mv6
+  WITH NO DATA;
+
+
+--
+-- Name: main_view; Type: MATERIALIZED VIEW; Schema: public; Owner: -
+--
+
+CREATE MATERIALIZED VIEW main_view AS
+ SELECT (((mv7.code)::text || '9'::text))::integer AS code,
+    (mv7.label || ' + main'::text) AS label,
+    mv7.code AS old_code,
+    'main'::text AS name
+   FROM mat_view_7 mv7
+UNION
+ SELECT (((mv8.code)::text || '9'::text))::integer AS code,
+    (mv8.label || ' + main'::text) AS label,
+    mv8.code AS old_code,
+    'main'::text AS name
+   FROM mat_view_8 mv8
+  WITH NO DATA;
+
+
 SET default_with_oids = false;
 
 --
@@ -209,6 +377,18 @@ SET default_with_oids = false;
 CREATE TABLE schema_migrations (
     version character varying NOT NULL
 );
+
+
+--
+-- Name: view_4; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW view_4 AS
+ SELECT (mv5.label || ' + V4'::text) AS label,
+    mv5.code,
+    mv5.old_code,
+    'V4'::text AS name
+   FROM mat_view_5 mv5;
 
 
 --
@@ -233,6 +413,8 @@ INSERT INTO schema_migrations (version) VALUES ('20151005150022');
 INSERT INTO schema_migrations (version) VALUES ('20160512173021');
 
 INSERT INTO schema_migrations (version) VALUES ('20160513141153');
+
+INSERT INTO schema_migrations (version) VALUES ('20171027181119');
 
 
         CREATE EVENT TRIGGER view_dependencies_update
