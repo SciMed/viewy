@@ -30,6 +30,19 @@ module Viewy
     view_refresher.refresh_materialized_view('all_view_dependencies')
   end
 
+  def self.with_delayed_dependency_updates
+    connection.execute <<-SQL.squish!
+      ALTER EVENT TRIGGER view_dependencies_update DISABLE;
+    SQL
+
+    yield
+
+    connection.execute <<-SQL.squish!
+      ALTER EVENT TRIGGER view_dependencies_update ENABLE ALWAYS;
+    SQL
+    Viewy.refresh_all_dependency_information
+  end
+
   # @return [Array<String>] the ordered names of all views in the system in safe dependency order
   def self.view_names_in_dependency_order
     Viewy::DependencyManagement::ViewSorter.new.sorted_views
