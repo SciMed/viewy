@@ -41,7 +41,7 @@ module Viewy
         result = connection.execute <<-SQL
           SELECT ispopulated FROM pg_matviews WHERE matviewname = '#{self.table_name}';
         SQL
-        ActiveRecord::Type::Boolean.new.type_cast_from_user(result.values[0][0])
+        ActiveRecord::Type::Boolean.new.cast(result.values[0][0])
       end
     end
   end

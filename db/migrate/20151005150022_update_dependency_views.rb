@@ -1,4 +1,4 @@
-class UpdateDependencyViews < ActiveRecord::Migration
+class UpdateDependencyViews < ActiveRecord::Migration[5.0]
   def up
     dependency_sql = <<-SQL
       DROP MATERIALIZED VIEW materialized_view_dependencies;

@@ -1,4 +1,4 @@
-class GenerateDummyViewHierarchy < ActiveRecord::Migration
+class GenerateDummyViewHierarchy < ActiveRecord::Migration[5.0]
   # Creates a hierarchy of views with dependencies with the following graph, where V = view and M = materialized view
   #
   #           main_view
