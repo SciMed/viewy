@@ -1,6 +1,10 @@
 #Viewy
 
-##NOTE this is only for use with postgres 9.4 or higher.  
+## Versions
+
+For Rails 4, use 0.4.0 or below. For Rails 5, use 0.5.0 or above.
+
+##NOTE this is only for use with postgres 9.4 or higher.
 
 In a nutshell, it provides two separate functionalities:
 
@@ -10,7 +14,7 @@ view_manager = Viewy::DependencyManager.new
 view_manager.replace_view(
   'd',
    <<-SQL
-     SELECT * FROM ... 
+     SELECT * FROM ...
    SQL
 )
 ```

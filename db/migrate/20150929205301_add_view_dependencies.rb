@@ -1,4 +1,4 @@
-class AddViewDependencies < ActiveRecord::Migration
+class AddViewDependencies < ActiveRecord::Migration[5.0]
   def up
     view_dependency_function_sql = <<-SQL
       CREATE OR REPLACE FUNCTION view_dependencies(materialized_view NAME)

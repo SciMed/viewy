@@ -61,7 +61,7 @@ module Viewy
       #   refresh has failed.  Since Postgres raises an error when an unpopulated view is refreshed concurrently, this
       #   allows the system to populated such views if needed
       private def attempt_non_concurrent_refresh?(ex, concurrently)
-        original_exception = ex.original_exception
+        original_exception = ex.cause
         should_retry_non_concurrently = original_exception.instance_of?(PG::FeatureNotSupported) ||
           original_exception.instance_of?(PG::ObjectNotInPrerequisiteState)
 

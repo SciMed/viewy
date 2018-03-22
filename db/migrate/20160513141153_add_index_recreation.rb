@@ -1,4 +1,4 @@
-class AddIndexRecreation < ActiveRecord::Migration
+class AddIndexRecreation < ActiveRecord::Migration[5.0]
   def up
     function_sql = <<-SQL
       CREATE OR REPLACE FUNCTION replace_view(view_name TEXT, new_sql TEXT) RETURNS VOID AS $$

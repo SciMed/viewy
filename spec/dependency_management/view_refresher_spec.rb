@@ -89,7 +89,9 @@ describe Viewy::DependencyManagement::ViewRefresher do
       end
       context 'failure is because concurrent refresh failed' do
         let(:statement_invalid) do
-          ActiveRecord::StatementInvalid.new('CONCURRENTLY failed on view', PG::FeatureNotSupported.new)
+          exception = ActiveRecord::StatementInvalid.new('CONCURRENTLY failed on view')
+          allow(exception).to receive(:cause).and_return(PG::ObjectNotInPrerequisiteState.new)
+          exception
         end
 
         it 'refreshes the failed view non-concurrently' do
@@ -102,7 +104,7 @@ describe Viewy::DependencyManagement::ViewRefresher do
       end
       context 'failure is for another reason' do
         let(:statement_invalid) do
-          ActiveRecord::StatementInvalid.new('Everything failed', RuntimeError.new)
+          ActiveRecord::StatementInvalid.new('Everything failed')
         end
 
         it 'raises the error back to the caller' do
