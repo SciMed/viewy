@@ -2,25 +2,66 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 9.6.5
--- Dumped by pg_dump version 10.0
+-- Dumped from database version 9.6.8
+-- Dumped by pg_dump version 9.6.8
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
 SET idle_in_transaction_session_timeout = 0;
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
 SET check_function_bodies = false;
 SET client_min_messages = warning;
 SET row_security = off;
 
-SET search_path = public, pg_catalog;
+--
+-- Name: all_view_dependencies(name); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.all_view_dependencies(materialized_view name) RETURNS name[]
+    LANGUAGE sql
+    AS $$
+        WITH RECURSIVE dependency_graph(oid, depth, path, cycle) AS (
+          SELECT oid, 1, ARRAY[oid], FALSE
+          FROM pg_class
+          WHERE relname = materialized_view
+          UNION
+          SELECT
+            dependents.refobjid,
+            dg.depth + 1,
+            dg.path || dependents.refobjid,
+            dependents.refobjid = ANY(dg.path)
+          FROM dependency_graph dg
+            JOIN pg_rewrite rewrites ON rewrites.ev_class = dg.oid
+            JOIN pg_depend dependents ON dependents.objid = rewrites.oid
+            JOIN pg_class ON dependents.refobjid = pg_class.OID 
+            JOIN pg_authid ON pg_class.relowner = pg_authid.OID AND pg_authid.rolname != 'postgres' 
+          WHERE NOT dg.cycle
+        ), dependencies AS(
+            SELECT
+              (SELECT relname FROM pg_class WHERE pg_class.OID = dependency_graph.oid) AS view_name,
+              dependency_graph.OID,
+              MIN(depth) AS min_depth
+            FROM dependency_graph
+            GROUP BY dependency_graph.OID ORDER BY min_depth
+        )
+        SELECT ARRAY(
+          SELECT dependencies.view_name 
+          FROM dependencies
+            LEFT JOIN pg_matviews ON pg_matviews.matviewname = dependencies.view_name
+            LEFT JOIN pg_views ON pg_views.viewname = dependencies.view_name
+          WHERE dependencies.view_name != materialized_view
+        )
+        ;
+      $$;
+
 
 --
 -- Name: refresh_materialized_view_dependencies(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION refresh_materialized_view_dependencies() RETURNS event_trigger
+CREATE FUNCTION public.refresh_materialized_view_dependencies() RETURNS event_trigger
     LANGUAGE plpgsql
     AS $$
         DECLARE
@@ -42,7 +83,7 @@ CREATE FUNCTION refresh_materialized_view_dependencies() RETURNS event_trigger
 -- Name: replace_view(text, text); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION replace_view(view_name text, new_sql text) RETURNS void
+CREATE FUNCTION public.replace_view(view_name text, new_sql text) RETURNS void
     LANGUAGE plpgsql
     AS $$
           DECLARE
@@ -134,7 +175,7 @@ CREATE FUNCTION replace_view(view_name text, new_sql text) RETURNS void
 -- Name: view_dependencies(name); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION view_dependencies(materialized_view name) RETURNS name[]
+CREATE FUNCTION public.view_dependencies(materialized_view name) RETURNS name[]
     LANGUAGE sql
     AS $$
         WITH RECURSIVE dependency_graph(oid, depth, path, cycle) AS (
@@ -170,46 +211,52 @@ CREATE FUNCTION view_dependencies(materialized_view name) RETURNS name[]
 SET default_tablespace = '';
 
 --
--- Name: materialized_view_dependencies; Type: MATERIALIZED VIEW; Schema: public; Owner: -
---
-
-CREATE MATERIALIZED VIEW materialized_view_dependencies AS
- SELECT pg_matviews.matviewname AS view_name,
-    view_dependencies(pg_matviews.matviewname) AS view_dependencies,
-    true AS materialized_view
-   FROM pg_matviews
-  WHERE ((pg_matviews.matviewname <> 'materialized_view_dependencies'::name) AND (pg_matviews.matviewname <> 'all_view_dependencies'::name))
-  WITH NO DATA;
-
-
---
 -- Name: all_view_dependencies; Type: MATERIALIZED VIEW; Schema: public; Owner: -
 --
 
-CREATE MATERIALIZED VIEW all_view_dependencies AS
+CREATE MATERIALIZED VIEW public.all_view_dependencies AS
  WITH normal_view_dependencies AS (
          SELECT pg_views.viewname AS view_name,
-            view_dependencies(pg_views.viewname) AS view_dependencies
+            public.all_view_dependencies(pg_views.viewname) AS view_dependencies
            FROM pg_views
+          WHERE (pg_views.viewowner <> 'postgres'::name)
+        ), matview_dependencies AS (
+         SELECT pg_matviews.matviewname AS view_name,
+            public.all_view_dependencies(pg_matviews.matviewname) AS view_dependencies
+           FROM pg_matviews
+          WHERE (pg_matviews.matviewowner <> 'postgres'::name)
         )
- SELECT materialized_view_dependencies.view_name,
-    materialized_view_dependencies.view_dependencies,
-    materialized_view_dependencies.materialized_view
-   FROM materialized_view_dependencies
+ SELECT matview_dependencies.view_name,
+    matview_dependencies.view_dependencies,
+    true AS materialized_view
+   FROM matview_dependencies
 UNION
  SELECT normal_view_dependencies.view_name,
     normal_view_dependencies.view_dependencies,
     false AS materialized_view
    FROM normal_view_dependencies
-  WHERE (array_length(normal_view_dependencies.view_dependencies, 1) > 0)
   WITH NO DATA;
+
+
+SET default_with_oids = false;
+
+--
+-- Name: ar_internal_metadata; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ar_internal_metadata (
+    key character varying NOT NULL,
+    value character varying,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL
+);
 
 
 --
 -- Name: mat_view_1; Type: MATERIALIZED VIEW; Schema: public; Owner: -
 --
 
-CREATE MATERIALIZED VIEW mat_view_1 AS
+CREATE MATERIALIZED VIEW public.mat_view_1 AS
  SELECT 'M1'::text AS label,
     'M1'::text AS name,
     1 AS code
@@ -220,7 +267,7 @@ CREATE MATERIALIZED VIEW mat_view_1 AS
 -- Name: mat_view_2; Type: MATERIALIZED VIEW; Schema: public; Owner: -
 --
 
-CREATE MATERIALIZED VIEW mat_view_2 AS
+CREATE MATERIALIZED VIEW public.mat_view_2 AS
  SELECT 'M2'::text AS label,
     'M2'::text AS name,
     2 AS code
@@ -231,11 +278,11 @@ CREATE MATERIALIZED VIEW mat_view_2 AS
 -- Name: mat_view_3; Type: MATERIALIZED VIEW; Schema: public; Owner: -
 --
 
-CREATE MATERIALIZED VIEW mat_view_3 AS
+CREATE MATERIALIZED VIEW public.mat_view_3 AS
  SELECT (mv1.label || ' + M3'::text) AS label,
     mv1.code AS old_code,
     (((mv1.code)::text || '3'::text))::integer AS code
-   FROM mat_view_1 mv1
+   FROM public.mat_view_1 mv1
   WITH NO DATA;
 
 
@@ -243,23 +290,23 @@ CREATE MATERIALIZED VIEW mat_view_3 AS
 -- Name: view_1; Type: VIEW; Schema: public; Owner: -
 --
 
-CREATE VIEW view_1 AS
+CREATE VIEW public.view_1 AS
  SELECT (mv2.label || ' + V1'::text) AS label,
     mv2.code,
     'V1'::text AS name
-   FROM mat_view_2 mv2;
+   FROM public.mat_view_2 mv2;
 
 
 --
 -- Name: mat_view_4; Type: MATERIALIZED VIEW; Schema: public; Owner: -
 --
 
-CREATE MATERIALIZED VIEW mat_view_4 AS
+CREATE MATERIALIZED VIEW public.mat_view_4 AS
  SELECT v1.code AS old_code,
     (v1.label || ' + M4'::text) AS label,
     (((v1.code)::text || '4'::text))::integer AS code,
     'M4'::text AS name
-   FROM view_1 v1
+   FROM public.view_1 v1
   WITH NO DATA;
 
 
@@ -267,12 +314,12 @@ CREATE MATERIALIZED VIEW mat_view_4 AS
 -- Name: mat_view_5; Type: MATERIALIZED VIEW; Schema: public; Owner: -
 --
 
-CREATE MATERIALIZED VIEW mat_view_5 AS
+CREATE MATERIALIZED VIEW public.mat_view_5 AS
  SELECT (((mv3.code)::text || '5'::text))::integer AS code,
     (mv3.label || ' + M5'::text) AS label,
     mv3.code AS old_code,
     'M5'::text AS name
-   FROM mat_view_3 mv3
+   FROM public.mat_view_3 mv3
   WITH NO DATA;
 
 
@@ -280,7 +327,7 @@ CREATE MATERIALIZED VIEW mat_view_5 AS
 -- Name: view_2; Type: VIEW; Schema: public; Owner: -
 --
 
-CREATE VIEW view_2 AS
+CREATE VIEW public.view_2 AS
  SELECT 'V2'::text AS label,
     222 AS code,
     'V2'::text AS name;
@@ -290,12 +337,12 @@ CREATE VIEW view_2 AS
 -- Name: mat_view_6; Type: MATERIALIZED VIEW; Schema: public; Owner: -
 --
 
-CREATE MATERIALIZED VIEW mat_view_6 AS
+CREATE MATERIALIZED VIEW public.mat_view_6 AS
  SELECT v2.code AS old_code,
     (v2.label || ' + M6'::text) AS label,
     (((v2.code)::text || '6'::text))::integer AS code,
     'M6'::text AS name
-   FROM view_2 v2
+   FROM public.view_2 v2
   WITH NO DATA;
 
 
@@ -303,30 +350,30 @@ CREATE MATERIALIZED VIEW mat_view_6 AS
 -- Name: view_3; Type: VIEW; Schema: public; Owner: -
 --
 
-CREATE VIEW view_3 AS
+CREATE VIEW public.view_3 AS
  SELECT (mv3.label || ' + V3'::text) AS label,
     mv3.code,
     mv3.old_code,
     'V3'::text AS name
-   FROM mat_view_3 mv3;
+   FROM public.mat_view_3 mv3;
 
 
 --
 -- Name: mat_view_7; Type: MATERIALIZED VIEW; Schema: public; Owner: -
 --
 
-CREATE MATERIALIZED VIEW mat_view_7 AS
+CREATE MATERIALIZED VIEW public.mat_view_7 AS
  SELECT (((v3.code)::text || '7'::text))::integer AS code,
     (v3.label || ' + M7'::text) AS label,
     v3.code AS old_code,
     'M7'::text AS name
-   FROM view_3 v3
+   FROM public.view_3 v3
 UNION
  SELECT (((mv4.code)::text || '7'::text))::integer AS code,
     (mv4.label || ' + M7'::text) AS label,
     mv4.code AS old_code,
     'M7'::text AS name
-   FROM mat_view_4 mv4
+   FROM public.mat_view_4 mv4
   WITH NO DATA;
 
 
@@ -334,18 +381,18 @@ UNION
 -- Name: mat_view_8; Type: MATERIALIZED VIEW; Schema: public; Owner: -
 --
 
-CREATE MATERIALIZED VIEW mat_view_8 AS
+CREATE MATERIALIZED VIEW public.mat_view_8 AS
  SELECT (((mv5.code)::text || '8'::text))::integer AS code,
     (mv5.label || ' + M8'::text) AS label,
     mv5.code AS old_code,
     'M8'::text AS name
-   FROM mat_view_5 mv5
+   FROM public.mat_view_5 mv5
 UNION
  SELECT (((mv6.code)::text || '8'::text))::integer AS code,
     (mv6.label || ' + M8'::text) AS label,
     mv6.code AS old_code,
     'M8'::text AS name
-   FROM mat_view_6 mv6
+   FROM public.mat_view_6 mv6
   WITH NO DATA;
 
 
@@ -353,49 +400,106 @@ UNION
 -- Name: main_view; Type: MATERIALIZED VIEW; Schema: public; Owner: -
 --
 
-CREATE MATERIALIZED VIEW main_view AS
+CREATE MATERIALIZED VIEW public.main_view AS
  SELECT (((mv7.code)::text || '9'::text))::integer AS code,
     (mv7.label || ' + main'::text) AS label,
     mv7.code AS old_code,
     'main'::text AS name
-   FROM mat_view_7 mv7
+   FROM public.mat_view_7 mv7
 UNION
  SELECT (((mv8.code)::text || '9'::text))::integer AS code,
     (mv8.label || ' + main'::text) AS label,
     mv8.code AS old_code,
     'main'::text AS name
-   FROM mat_view_8 mv8
+   FROM public.mat_view_8 mv8
   WITH NO DATA;
 
 
-SET default_with_oids = false;
+--
+-- Name: materialized_view_dependencies; Type: MATERIALIZED VIEW; Schema: public; Owner: -
+--
+
+CREATE MATERIALIZED VIEW public.materialized_view_dependencies AS
+ SELECT pg_matviews.matviewname AS view_name,
+    public.view_dependencies(pg_matviews.matviewname) AS view_dependencies,
+    true AS materialized_view
+   FROM pg_matviews
+  WHERE ((pg_matviews.matviewname <> 'materialized_view_dependencies'::name) AND (pg_matviews.matviewname <> 'all_view_dependencies'::name))
+  WITH NO DATA;
+
 
 --
 -- Name: schema_migrations; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE schema_migrations (
+CREATE TABLE public.schema_migrations (
     version character varying NOT NULL
 );
+
+
+--
+-- Name: test_view_2; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW public.test_view_2 AS
+ SELECT false AS is_materialized,
+    mat_view_2.label AS col_1
+   FROM public.mat_view_2;
+
+
+--
+-- Name: test_view_3; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW public.test_view_3 AS
+ SELECT 'bar'::text AS col_1,
+    'baz'::text AS col_2;
+
+
+--
+-- Name: test_view_1; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW public.test_view_1 AS
+ SELECT ((test_view_2.col_1 || test_view_3.col_1) || test_view_3.col_2) AS result
+   FROM (public.test_view_2
+     JOIN public.test_view_3 ON (true));
+
+
+--
+-- Name: test_view_4; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW public.test_view_4 AS
+ SELECT 'fizz'::text AS col_1,
+    'buzz'::text AS col_2;
 
 
 --
 -- Name: view_4; Type: VIEW; Schema: public; Owner: -
 --
 
-CREATE VIEW view_4 AS
+CREATE VIEW public.view_4 AS
  SELECT (mv5.label || ' + V4'::text) AS label,
     mv5.code,
     mv5.old_code,
     'V4'::text AS name
-   FROM mat_view_5 mv5;
+   FROM public.mat_view_5 mv5;
+
+
+--
+-- Name: ar_internal_metadata ar_internal_metadata_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ar_internal_metadata
+    ADD CONSTRAINT ar_internal_metadata_pkey PRIMARY KEY (key);
 
 
 --
 -- Name: unique_schema_migrations; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX unique_schema_migrations ON schema_migrations USING btree (version);
+CREATE UNIQUE INDEX unique_schema_migrations ON public.schema_migrations USING btree (version);
 
 
 --
@@ -404,17 +508,16 @@ CREATE UNIQUE INDEX unique_schema_migrations ON schema_migrations USING btree (v
 
 SET search_path TO public;
 
-INSERT INTO schema_migrations (version) VALUES ('20150929144540');
+INSERT INTO "schema_migrations" (version) VALUES
+('20150929144540'),
+('20150929205301'),
+('20151005150022'),
+('20160512173021'),
+('20160513141153'),
+('20171027181119'),
+('20180518193352'),
+('20180518200311');
 
-INSERT INTO schema_migrations (version) VALUES ('20150929205301');
-
-INSERT INTO schema_migrations (version) VALUES ('20151005150022');
-
-INSERT INTO schema_migrations (version) VALUES ('20160512173021');
-
-INSERT INTO schema_migrations (version) VALUES ('20160513141153');
-
-INSERT INTO schema_migrations (version) VALUES ('20171027181119');
 
 
         CREATE EVENT TRIGGER view_dependencies_update

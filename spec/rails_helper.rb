@@ -59,4 +59,8 @@ RSpec.configure do |config|
       with.library :rails
     end
   end
+
+  config.before :suite do
+    Viewy.refresh_all_dependency_information
+  end
 end
