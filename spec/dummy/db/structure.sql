@@ -37,7 +37,7 @@ CREATE FUNCTION public.all_view_dependencies(materialized_view name) RETURNS nam
             JOIN pg_depend dependents ON dependents.objid = rewrites.oid
             JOIN pg_class ON dependents.refobjid = pg_class.OID 
             JOIN pg_authid ON pg_class.relowner = pg_authid.OID AND pg_authid.rolname != 'postgres' 
-          WHERE NOT dg.cycle
+          WHERE NOT dg.cycle AND pg_class.relkind IN ('m', 'v')
         ), dependencies AS(
             SELECT
               (SELECT relname FROM pg_class WHERE pg_class.OID = dependency_graph.oid) AS view_name,
@@ -438,6 +438,35 @@ CREATE TABLE public.schema_migrations (
 
 
 --
+-- Name: table_1; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.table_1 (
+    id integer NOT NULL,
+    col_1 character varying
+);
+
+
+--
+-- Name: table_1_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.table_1_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: table_1_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.table_1_id_seq OWNED BY public.table_1.id;
+
+
+--
 -- Name: test_view_2; Type: VIEW; Schema: public; Owner: -
 --
 
@@ -471,8 +500,9 @@ CREATE VIEW public.test_view_1 AS
 --
 
 CREATE VIEW public.test_view_4 AS
- SELECT 'fizz'::text AS col_1,
-    'buzz'::text AS col_2;
+ SELECT (table_1.col_1)::text AS col_1,
+    'buzz'::text AS col_2
+   FROM public.table_1;
 
 
 --
@@ -488,11 +518,26 @@ CREATE VIEW public.view_4 AS
 
 
 --
+-- Name: table_1 id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.table_1 ALTER COLUMN id SET DEFAULT nextval('public.table_1_id_seq'::regclass);
+
+
+--
 -- Name: ar_internal_metadata ar_internal_metadata_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.ar_internal_metadata
     ADD CONSTRAINT ar_internal_metadata_pkey PRIMARY KEY (key);
+
+
+--
+-- Name: table_1 table_1_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.table_1
+    ADD CONSTRAINT table_1_pkey PRIMARY KEY (id);
 
 
 --
@@ -516,7 +561,9 @@ INSERT INTO "schema_migrations" (version) VALUES
 ('20160513141153'),
 ('20171027181119'),
 ('20180518193352'),
-('20180518200311');
+('20180518200311'),
+('20180521160749'),
+('20180521162238');
 
 
 

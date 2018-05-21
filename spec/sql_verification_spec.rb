@@ -34,6 +34,49 @@ describe 'Viewy sql functions' do
     end
   end
 
+  describe 'all_view_dependencies' do
+    context 'there are no views in the hierarchy' do
+      it 'returns the dependencies for the passed view' do
+        result = ActiveRecord::Base.connection.execute <<-SQL
+          SELECT all_view_dependencies('mat_view_5');
+        SQL
+        dependencies = '{mat_view_3,mat_view_1}'
+
+        expect(result.values[0][0]).to eql dependencies
+      end
+    end
+    context 'there are tables in the hierarchy' do
+      it 'returns only the vies dependencies for the passed view' do
+        result = ActiveRecord::Base.connection.execute <<-SQL
+          SELECT all_view_dependencies('test_view_4');
+        SQL
+        dependencies = '{}'
+
+        expect(result.values[0][0]).to eql dependencies
+      end
+    end
+    context 'there no views in the hierarchy' do
+      it 'returns all dependencies for the passed view' do
+        result = ActiveRecord::Base.connection.execute <<-SQL
+          SELECT all_view_dependencies('mat_view_7');
+        SQL
+        dependencies_first_tier = %w(mat_view_4 view_3)
+        dependencies_second_tier = %w(mat_view_3 view_1)
+        dependencies_third_tier = %w(mat_view_2 mat_view_1)
+
+        dependencies_from_server = result.values[0][0]
+        dependencies_from_server = dependencies_from_server[1..dependencies_from_server.length - 2].split(',')
+        expect(dependencies_from_server.length).to eql 6
+
+        # So long as all dependencies from the server are present in the correct tier ordering does not matter,
+        # and is not stable from Postgres
+        expect(dependencies_from_server[0..1]).to match_array dependencies_first_tier
+        expect(dependencies_from_server[2..3]).to match_array dependencies_second_tier
+        expect(dependencies_from_server[4..5]).to match_array dependencies_third_tier
+      end
+    end
+  end
+
   describe 'replace_view' do
     it 'replaces the a view in the middle of the hierarchy' do
       expect {
