@@ -23,12 +23,13 @@ module Viewy
     # NOTE: this is provided as a convenience for managing dependencies, and the user should not expect that the
     # re-created views will function if they rely on parts of the replaced view that are removed.
     #
-    # @param view_name [String] the name of the view being replaced
+    # @param view_name [String] the name of the view being replaced (optionally schema-qualified)
     # @param new_definition_sql [String] the SQL definition of the new view
     #
     # @raise [ActiveRecord::StatementInvalidError] raised if a dependent view is somehow not refreshed correctly
     # @return [PG::Result] the result of the refresh statement on the materialized view
     def replace_view(view_name, new_definition_sql, &block)
+      view_name = view_name.split('.').last
       Viewy.connection.execute("SELECT replace_view('#{view_name}', $$#{new_definition_sql}$$)")
       block.call if block_given?
     end

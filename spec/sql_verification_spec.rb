@@ -10,7 +10,7 @@ describe 'Viewy sql functions' do
         result = ActiveRecord::Base.connection.execute <<-SQL
           SELECT view_dependencies('mat_view_5');
         SQL
-        dependencies = '{mat_view_3,mat_view_1}'
+        dependencies = '{public.mat_view_3,public.mat_view_1}'
 
         expect(result.values[0][0]).to eql dependencies
       end
@@ -20,8 +20,8 @@ describe 'Viewy sql functions' do
         result = ActiveRecord::Base.connection.execute <<-SQL
           SELECT view_dependencies('mat_view_7');
         SQL
-        dependencies_first_tier = %w(mat_view_4 mat_view_3)
-        dependencies_second_tier = %w(mat_view_2 mat_view_1)
+        dependencies_first_tier = %w(public.mat_view_4 public.mat_view_3)
+        dependencies_second_tier = %w(public.mat_view_2 public.mat_view_1)
 
         dependencies_from_server = result.values[0][0]
         dependencies_from_server = dependencies_from_server[1..dependencies_from_server.length - 2].split(',')
@@ -40,7 +40,7 @@ describe 'Viewy sql functions' do
         result = ActiveRecord::Base.connection.execute <<-SQL
           SELECT all_view_dependencies('mat_view_5');
         SQL
-        dependencies = '{mat_view_3,mat_view_1}'
+        dependencies = '{public.mat_view_1,public.mat_view_3}'
 
         expect(result.values[0][0]).to eql dependencies
       end
@@ -60,9 +60,12 @@ describe 'Viewy sql functions' do
         result = ActiveRecord::Base.connection.execute <<-SQL
           SELECT all_view_dependencies('mat_view_7');
         SQL
-        dependencies_first_tier = %w(mat_view_4 view_3)
-        dependencies_second_tier = %w(mat_view_3 view_1)
-        dependencies_third_tier = %w(mat_view_2 mat_view_1)
+        dependency_orders = {
+          'public.mat_view_3' => %w[public.mat_view_1],
+          'public.view_1'     => %w[public.mat_view_2],
+          'public.mat_view_4' => %w[public.view_1],
+          'public.view_3'     => %w[public.mat_view_3]
+        }
 
         dependencies_from_server = result.values[0][0]
         dependencies_from_server = dependencies_from_server[1..dependencies_from_server.length - 2].split(',')
@@ -70,9 +73,11 @@ describe 'Viewy sql functions' do
 
         # So long as all dependencies from the server are present in the correct tier ordering does not matter,
         # and is not stable from Postgres
-        expect(dependencies_from_server[0..1]).to match_array dependencies_first_tier
-        expect(dependencies_from_server[2..3]).to match_array dependencies_second_tier
-        expect(dependencies_from_server[4..5]).to match_array dependencies_third_tier
+        dependency_orders.each do |view, dependencies|
+          dependencies.each do |dependency|
+            expect(dependencies_from_server.index(dependency)).to be < dependencies_from_server.index(view)
+          end
+        end
       end
     end
   end
@@ -84,13 +89,13 @@ describe 'Viewy sql functions' do
           SELECT replace_view('mat_view_7', $$
             CREATE MATERIALIZED VIEW mat_view_7 AS
               SELECT
-                (v3.code::TEXT || '7')::INT    AS code, 
+                (v3.code::TEXT || '7')::INT    AS code,
                 v3.label || 'M7.1'             AS label,
                 v3.code                        AS old_code,
                 'M7.1'::TEXT                   AS "name"
-              FROM view_3 v3     
+              FROM view_3 v3
               UNION
-              SELECT     
+              SELECT
                 (mv4.code::TEXT || '7')::INT  AS code ,
                 mv4.label || ' + M7.1'        AS label,
                 mv4.code                      AS old_code,
@@ -127,26 +132,26 @@ describe 'Viewy sql functions' do
       expect {
         ActiveRecord::Base.connection.execute <<-SQL
           CREATE MATERIALIZED VIEW baz AS
-            SELECT 
+            SELECT
               true  AS column_1
           ;
           CREATE VIEW bar AS
-            SELECT 
+            SELECT
               true  AS column_1,
               baz.column_1 AS column_2
             FROM baz
           ;
           CREATE MATERIALIZED VIEW foo AS
-            SELECT 
+            SELECT
               true  AS column_1,
               bar.column_1 AS column_2
             FROM bar
           ;
         SQL
-      }.to change { Viewy::Models::ViewDependency.find_by(view_name: 'bar') }
+      }.to change { Viewy::Models::ViewDependency.find_by(view_name: 'public.bar') }
         .from(nil)
         .to(instance_of(Viewy::Models::ViewDependency))
-      .and change { Viewy::Models::MaterializedViewDependency.find_by(view_name: 'foo') }
+        .and change { Viewy::Models::MaterializedViewDependency.find_by(view_name: 'public.foo') }
         .from(nil)
         .to(instance_of(Viewy::Models::MaterializedViewDependency))
     end

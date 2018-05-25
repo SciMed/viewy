@@ -1,10 +1,3 @@
---
--- PostgreSQL database dump
---
-
--- Dumped from database version 9.6.8
--- Dumped by pg_dump version 9.6.8
-
 SET statement_timeout = 0;
 SET lock_timeout = 0;
 SET idle_in_transaction_session_timeout = 0;
@@ -19,7 +12,7 @@ SET row_security = off;
 -- Name: all_view_dependencies(name); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.all_view_dependencies(materialized_view name) RETURNS name[]
+CREATE FUNCTION public.all_view_dependencies(materialized_view name) RETURNS text[]
     LANGUAGE sql
     AS $$
         WITH RECURSIVE dependency_graph(oid, depth, path, cycle) AS (
@@ -35,22 +28,30 @@ CREATE FUNCTION public.all_view_dependencies(materialized_view name) RETURNS nam
           FROM dependency_graph dg
             JOIN pg_rewrite rewrites ON rewrites.ev_class = dg.oid
             JOIN pg_depend dependents ON dependents.objid = rewrites.oid
-            JOIN pg_class ON dependents.refobjid = pg_class.OID 
-            JOIN pg_authid ON pg_class.relowner = pg_authid.OID AND pg_authid.rolname != 'postgres' 
+            JOIN pg_class ON dependents.refobjid = pg_class.OID
+            JOIN pg_authid ON pg_class.relowner = pg_authid.OID AND pg_authid.rolname != 'postgres'
           WHERE NOT dg.cycle AND pg_class.relkind IN ('m', 'v')
         ), dependencies AS(
             SELECT
-              (SELECT relname FROM pg_class WHERE pg_class.OID = dependency_graph.oid) AS view_name,
+              pg_class.relname AS view_name,
+              schemas.nspname AS schema_name,
               dependency_graph.OID,
               MIN(depth) AS min_depth
             FROM dependency_graph
-            GROUP BY dependency_graph.OID ORDER BY min_depth
+            LEFT JOIN pg_class ON pg_class.OID = dependency_graph.oid
+            LEFT JOIN pg_catalog.pg_namespace schemas ON schemas.oid = pg_class.relnamespace
+            GROUP BY dependency_graph.OID, pg_class.relname, schemas.nspname
+            ORDER BY min_depth
         )
         SELECT ARRAY(
-          SELECT dependencies.view_name 
+          SELECT dependencies.schema_name || '.' || dependencies.view_name
           FROM dependencies
-            LEFT JOIN pg_matviews ON pg_matviews.matviewname = dependencies.view_name
-            LEFT JOIN pg_views ON pg_views.viewname = dependencies.view_name
+            LEFT JOIN pg_matviews
+                   ON pg_matviews.matviewname = dependencies.view_name
+                     AND pg_matviews.schemaname = dependencies.schema_name
+            LEFT JOIN pg_views
+                   ON pg_views.viewname = dependencies.view_name
+                     AND pg_views.schemaname = dependencies.schema_name
           WHERE dependencies.view_name != materialized_view
         )
         ;
@@ -175,7 +176,7 @@ CREATE FUNCTION public.replace_view(view_name text, new_sql text) RETURNS void
 -- Name: view_dependencies(name); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.view_dependencies(materialized_view name) RETURNS name[]
+CREATE FUNCTION public.view_dependencies(materialized_view name) RETURNS text[]
     LANGUAGE sql
     AS $$
         WITH RECURSIVE dependency_graph(oid, depth, path, cycle) AS (
@@ -194,15 +195,21 @@ CREATE FUNCTION public.view_dependencies(materialized_view name) RETURNS name[]
           WHERE NOT dg.cycle
         ), dependencies AS(
             SELECT
-              (SELECT relname FROM pg_class WHERE pg_class.OID = dependency_graph.oid) AS view_name,
+              pg_class.relname AS view_name,
+              schemas.nspname AS schema_name,
               dependency_graph.OID,
               MIN(depth) AS min_depth
             FROM dependency_graph
-            GROUP BY dependency_graph.OID ORDER BY min_depth
+            LEFT JOIN pg_class ON pg_class.OID = dependency_graph.oid
+            LEFT JOIN pg_catalog.pg_namespace schemas ON schemas.oid = pg_class.relnamespace
+            GROUP BY dependency_graph.OID, pg_class.relname, schemas.nspname
+            ORDER BY min_depth
         )
-        SELECT ARRAY(SELECT dependencies.view_name FROM
+        SELECT ARRAY(SELECT dependencies.schema_name || '.' || dependencies.view_name FROM
           dependencies
-          JOIN pg_matviews ON pg_matviews.matviewname = dependencies.view_name
+          JOIN pg_matviews
+            ON pg_matviews.matviewname = dependencies.view_name
+              AND pg_matviews.schemaname = dependencies.schema_name
         WHERE dependencies.view_name != materialized_view)
         ;
       $$;
@@ -216,12 +223,12 @@ SET default_tablespace = '';
 
 CREATE MATERIALIZED VIEW public.all_view_dependencies AS
  WITH normal_view_dependencies AS (
-         SELECT pg_views.viewname AS view_name,
+         SELECT (((pg_views.schemaname)::text || '.'::text) || (pg_views.viewname)::text) AS view_name,
             public.all_view_dependencies(pg_views.viewname) AS view_dependencies
            FROM pg_views
           WHERE (pg_views.viewowner <> 'postgres'::name)
         ), matview_dependencies AS (
-         SELECT pg_matviews.matviewname AS view_name,
+         SELECT (((pg_matviews.schemaname)::text || '.'::text) || (pg_matviews.matviewname)::text) AS view_name,
             public.all_view_dependencies(pg_matviews.matviewname) AS view_dependencies
            FROM pg_matviews
           WHERE (pg_matviews.matviewowner <> 'postgres'::name)
@@ -420,7 +427,7 @@ UNION
 --
 
 CREATE MATERIALIZED VIEW public.materialized_view_dependencies AS
- SELECT pg_matviews.matviewname AS view_name,
+ SELECT (((pg_matviews.schemaname)::text || '.'::text) || (pg_matviews.matviewname)::text) AS view_name,
     public.view_dependencies(pg_matviews.matviewname) AS view_dependencies,
     true AS materialized_view
    FROM pg_matviews
@@ -533,18 +540,19 @@ ALTER TABLE ONLY public.ar_internal_metadata
 
 
 --
+-- Name: schema_migrations schema_migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.schema_migrations
+    ADD CONSTRAINT schema_migrations_pkey PRIMARY KEY (version);
+
+
+--
 -- Name: table_1 table_1_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.table_1
     ADD CONSTRAINT table_1_pkey PRIMARY KEY (id);
-
-
---
--- Name: unique_schema_migrations; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX unique_schema_migrations ON public.schema_migrations USING btree (version);
 
 
 --
@@ -554,16 +562,17 @@ CREATE UNIQUE INDEX unique_schema_migrations ON public.schema_migrations USING b
 SET search_path TO public;
 
 INSERT INTO "schema_migrations" (version) VALUES
-('20150929144540'),
-('20150929205301'),
-('20151005150022'),
-('20160512173021'),
-('20160513141153'),
 ('20171027181119'),
 ('20180518193352'),
-('20180518200311'),
 ('20180521160749'),
-('20180521162238');
+('20180525175943'),
+('20180525175944'),
+('20180525175945'),
+('20180525175946'),
+('20180525175947'),
+('20180525175948'),
+('20180525175949'),
+('20180525175950');
 
 
 

@@ -42,6 +42,7 @@ module Viewy
       end
 
       private def refresh_single_view(view_name, concurrently:)
+        view_name = view_name.split('.').last
         begin
           connection.execute(refresh_sql(view_name, concurrently))
         rescue ActiveRecord::StatementInvalid => ex

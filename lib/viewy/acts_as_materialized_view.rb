@@ -13,7 +13,8 @@ module Viewy
       # @return [PG::Result] the result of the refresh statement on the materialized view
       def refresh!(concurrently: false)
         refresher = Viewy::DependencyManagement::ViewRefresher.new(Viewy.connection)
-        refresher.refresh_materialized_view(table_name, with_dependencies: true, concurrently: concurrently)
+        view_name = "#{schema_name}.#{table_name}"
+        refresher.refresh_materialized_view(view_name, with_dependencies: true, concurrently: concurrently)
       end
 
       # Refreshes this view without refreshing any dependencies
@@ -42,6 +43,10 @@ module Viewy
           SELECT ispopulated FROM pg_matviews WHERE matviewname = '#{self.table_name}';
         SQL
         ActiveRecord::Type::Boolean.new.cast(result.values[0][0])
+      end
+
+      private def schema_name
+        connection.current_schema
       end
     end
   end
