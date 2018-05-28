@@ -35,6 +35,9 @@ describe Viewy do
         public.test_view_1
         public.view_4
         public.all_view_dependencies
+        foo.test_view_3
+        foo.other_view
+        foo.mat_view
       ]
 
       result = Viewy.view_names_in_dependency_order

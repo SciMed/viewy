@@ -24,3 +24,26 @@ describe MainView do
     end
   end
 end
+
+class FooMatView < ActiveRecord::Base
+  include Viewy::ActsAsMaterializedView
+
+  self.table_name = 'foo.mat_view'
+end
+
+describe FooMatView do
+  describe '.sorted_view_dependencies' do
+    it 'returns the view dependencies' do
+      expect(described_class.sorted_view_dependencies).to eql ['public.mat_view_1']
+    end
+  end
+  describe '.refresh!' do
+    it 'does not raise an error' do
+      expect {
+        described_class.refresh!
+      }.not_to raise_error
+    end
+  end
+end
+
+

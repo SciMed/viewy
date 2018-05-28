@@ -61,12 +61,10 @@ describe 'Viewy sql functions' do
         result = ActiveRecord::Base.connection.execute <<-SQL
           SELECT all_view_dependencies('mat_view_7', 'public');
         SQL
-        dependency_orders = {
-          'public.mat_view_3' => %w[public.mat_view_1],
-          'public.view_1'     => %w[public.mat_view_2],
-          'public.mat_view_4' => %w[public.view_1],
-          'public.view_3'     => %w[public.mat_view_3]
-        }
+
+        dependencies_first_tier = %w(public.mat_view_4 public.view_3)
+        dependencies_second_tier = %w(public.mat_view_3 public.view_1)
+        dependencies_third_tier = %w(public.mat_view_2 public.mat_view_1)
 
         dependencies_from_server = result.values[0][0]
         dependencies_from_server = dependencies_from_server[1..dependencies_from_server.length - 2].split(',')
@@ -74,11 +72,9 @@ describe 'Viewy sql functions' do
 
         # So long as all dependencies from the server are present in the correct tier ordering does not matter,
         # and is not stable from Postgres
-        dependency_orders.each do |view, dependencies|
-          dependencies.each do |dependency|
-            expect(dependencies_from_server.index(dependency)).to be > dependencies_from_server.index(view)
-          end
-        end
+        expect(dependencies_from_server[0..1]).to match_array dependencies_first_tier
+        expect(dependencies_from_server[2..3]).to match_array dependencies_second_tier
+        expect(dependencies_from_server[4..5]).to match_array dependencies_third_tier
       end
     end
   end

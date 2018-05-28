@@ -12,9 +12,11 @@ module Viewy
       #
       # @return [nil]
       def refresh!
-        view_dep = Viewy::Models::MaterializedViewDependency.find(table_name)
-        view_dep.view_dependencies.each do |view_dependency|
-          ActiveRecord::Base.connection.execute("REFRESH MATERIALIZED VIEW #{view_dependency}")
+        view_dep = Viewy::Models::ViewDependency.find(table_name)
+        deps = Viewy::DependencyManagement::ViewSorter.new.sorted_view_subset(view_names: view_dep.view_dependencies)
+        deps.each do |view_dependency|
+          materialized_view_dependency = Viewy::Models::MaterializedViewDependency.find_by(view_name: view_dependency)
+          ActiveRecord::Base.connection.execute("REFRESH MATERIALIZED VIEW #{view_dependency}") if materialized_view_dependency
         end
       end
     end

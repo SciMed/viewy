@@ -16,6 +16,13 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
+-- Name: foo; Type: SCHEMA; Schema: -; Owner: -
+--
+
+CREATE SCHEMA foo;
+
+
+--
 -- Name: all_view_dependencies(name, name); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -25,6 +32,7 @@ CREATE FUNCTION public.all_view_dependencies(materialized_view name, view_schema
         WITH RECURSIVE dependency_graph(oid, depth, path, cycle) AS (
           SELECT pg_class.oid, 1, ARRAY[pg_class.oid], FALSE
           FROM pg_class
+            JOIN pg_namespace ON pg_class.relnamespace = pg_namespace.OID AND pg_namespace.nspname = view_schema
           WHERE relname = materialized_view
           UNION
           SELECT
@@ -203,8 +211,9 @@ CREATE FUNCTION public.view_dependencies(materialized_view name, view_schema nam
     LANGUAGE sql
     AS $$
         WITH RECURSIVE dependency_graph(oid, depth, path, cycle) AS (
-          SELECT oid, 1, ARRAY[oid], FALSE
+          SELECT pg_class.oid, 1, ARRAY[pg_class.oid], FALSE
           FROM pg_class
+            JOIN pg_namespace ON pg_class.relnamespace = pg_namespace.OID AND pg_namespace.nspname = view_schema
           WHERE relname = materialized_view
           UNION
           SELECT
@@ -254,15 +263,6 @@ CREATE FUNCTION public.view_dependencies(materialized_view name, view_schema nam
       $$;
 
 
---
--- Name: test_view_3; Type: VIEW; Schema: public; Owner: -
---
-
-CREATE VIEW public.test_view_3 AS
- SELECT 'bar'::text AS col_1,
-    'baz'::text AS col_2;
-
-
 SET default_tablespace = '';
 
 --
@@ -274,6 +274,35 @@ CREATE MATERIALIZED VIEW public.mat_view_1 AS
     'M1'::text AS name,
     1 AS code
   WITH NO DATA;
+
+
+--
+-- Name: mat_view; Type: MATERIALIZED VIEW; Schema: foo; Owner: -
+--
+
+CREATE MATERIALIZED VIEW foo.mat_view AS
+ SELECT mat_view_1.label
+   FROM public.mat_view_1
+  WITH NO DATA;
+
+
+--
+-- Name: test_view_3; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW public.test_view_3 AS
+ SELECT 'bar'::text AS col_1,
+    'baz'::text AS col_2;
+
+
+--
+-- Name: test_view_3; Type: VIEW; Schema: foo; Owner: -
+--
+
+CREATE VIEW foo.test_view_3 AS
+ SELECT test_view_3.col_1,
+    'baz'::text AS col_2
+   FROM public.test_view_3;
 
 
 --
@@ -426,6 +455,17 @@ UNION
     'main'::text AS name
    FROM public.mat_view_8 mv8
   WITH NO DATA;
+
+
+--
+-- Name: other_view; Type: VIEW; Schema: foo; Owner: -
+--
+
+CREATE VIEW foo.other_view AS
+ SELECT main_view.label AS col_1,
+    test_view_3.col_2
+   FROM foo.test_view_3,
+    public.main_view;
 
 
 --
@@ -598,7 +638,7 @@ ALTER TABLE ONLY public.table_1
 -- PostgreSQL database dump complete
 --
 
-SET search_path TO public;
+SET search_path TO public,foo;
 
 INSERT INTO "schema_migrations" (version) VALUES
 ('20150929144540'),
@@ -613,7 +653,8 @@ INSERT INTO "schema_migrations" (version) VALUES
 ('20180521162238'),
 ('20180525142127'),
 ('20180528164845'),
-('20180528165706');
+('20180528165706'),
+('20180528211227');
 
 
 

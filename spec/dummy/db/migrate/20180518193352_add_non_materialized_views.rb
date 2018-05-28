@@ -1,11 +1,15 @@
 class AddNonMaterializedViews < ActiveRecord::Migration[5.0]
   # Creates a hierarchy of views with dependencies with the following graph, where V = view and M = materialized view
-  #
-  #    V1        V4
-  #  /   \
-  # V2    V3
-  # |
-  # M2 (see generate_dummy_view_hierarchy.rb)
+  #                   main_view               TV4
+  #                 /     |     \
+  #               M7     V4      M8
+  #             /   \       \   /  \
+  #   tv1      M4   V3       M5     M6
+  #  /   \    |      \     /       |
+  # tv3  tv2  V1      \   /        V2
+  #         \ |         M3
+  #          M2        |
+  #                     M1
   def up
     execute <<-SQL
       CREATE VIEW test_view_2 AS

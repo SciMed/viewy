@@ -14,8 +14,9 @@ class UpdateSchemaNameInViewDependencies < ActiveRecord::Migration[5.0]
         RETURNS TEXT[]
       AS $$
         WITH RECURSIVE dependency_graph(oid, depth, path, cycle) AS (
-          SELECT oid, 1, ARRAY[oid], FALSE
+          SELECT pg_class.oid, 1, ARRAY[pg_class.oid], FALSE
           FROM pg_class
+            JOIN pg_namespace ON pg_class.relnamespace = pg_namespace.OID AND pg_namespace.nspname = view_schema
           WHERE relname = materialized_view
           UNION
           SELECT
@@ -73,6 +74,7 @@ class UpdateSchemaNameInViewDependencies < ActiveRecord::Migration[5.0]
         WITH RECURSIVE dependency_graph(oid, depth, path, cycle) AS (
           SELECT pg_class.oid, 1, ARRAY[pg_class.oid], FALSE
           FROM pg_class
+            JOIN pg_namespace ON pg_class.relnamespace = pg_namespace.OID AND pg_namespace.nspname = view_schema
           WHERE relname = materialized_view
           UNION
           SELECT
