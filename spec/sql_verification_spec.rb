@@ -8,7 +8,7 @@ describe 'Viewy sql functions' do
     context 'there are no views in the hierarchy' do
       it 'returns the dependencies for the passed view' do
         result = ActiveRecord::Base.connection.execute <<-SQL
-          SELECT view_dependencies('mat_view_5');
+          SELECT view_dependencies('mat_view_5', 'public');
         SQL
         dependencies = '{public.mat_view_3,public.mat_view_1}'
 
@@ -18,7 +18,7 @@ describe 'Viewy sql functions' do
     context 'there no views in the hierarchy' do
       it 'returns the materialized dependencies for the passed view' do
         result = ActiveRecord::Base.connection.execute <<-SQL
-          SELECT view_dependencies('mat_view_7');
+          SELECT view_dependencies('mat_view_7', 'public');
         SQL
         dependencies_first_tier = %w(public.mat_view_4 public.mat_view_3)
         dependencies_second_tier = %w(public.mat_view_2 public.mat_view_1)
@@ -38,9 +38,10 @@ describe 'Viewy sql functions' do
     context 'there are no views in the hierarchy' do
       it 'returns the dependencies for the passed view' do
         result = ActiveRecord::Base.connection.execute <<-SQL
-          SELECT all_view_dependencies('mat_view_5');
+          SELECT view_dependencies('mat_view_5', 'public');
         SQL
-        dependencies = '{public.mat_view_1,public.mat_view_3}'
+
+        dependencies = '{public.mat_view_3,public.mat_view_1}'
 
         expect(result.values[0][0]).to eql dependencies
       end
@@ -48,7 +49,7 @@ describe 'Viewy sql functions' do
     context 'there are tables in the hierarchy' do
       it 'returns only the vies dependencies for the passed view' do
         result = ActiveRecord::Base.connection.execute <<-SQL
-          SELECT all_view_dependencies('test_view_4');
+          SELECT all_view_dependencies('test_view_4', 'public');
         SQL
         dependencies = '{}'
 
@@ -58,7 +59,7 @@ describe 'Viewy sql functions' do
     context 'there no views in the hierarchy' do
       it 'returns all dependencies for the passed view' do
         result = ActiveRecord::Base.connection.execute <<-SQL
-          SELECT all_view_dependencies('mat_view_7');
+          SELECT all_view_dependencies('mat_view_7', 'public');
         SQL
         dependency_orders = {
           'public.mat_view_3' => %w[public.mat_view_1],
@@ -75,7 +76,7 @@ describe 'Viewy sql functions' do
         # and is not stable from Postgres
         dependency_orders.each do |view, dependencies|
           dependencies.each do |dependency|
-            expect(dependencies_from_server.index(dependency)).to be < dependencies_from_server.index(view)
+            expect(dependencies_from_server.index(dependency)).to be > dependencies_from_server.index(view)
           end
         end
       end
